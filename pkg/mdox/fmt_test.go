@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/bwplotka/mdox/pkg/testutil"
 )
 
 func Test_FormatSingle_NoTransformers(t *testing.T) {
