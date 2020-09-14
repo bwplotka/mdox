@@ -12,7 +12,7 @@ import (
 	"github.com/bwplotka/mdox/pkg/testutil"
 )
 
-func Test_FormatSingle_NoTransformers(t *testing.T) {
+func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 	file, err := os.OpenFile("testdata/not_formatted.md", os.O_RDONLY, 0)
 	testutil.Ok(t, err)
 	defer file.Close()
@@ -21,11 +21,18 @@ func Test_FormatSingle_NoTransformers(t *testing.T) {
 
 	buf := bytes.Buffer{}
 	testutil.Ok(t, f.FormatSingle(file, &buf))
-	//testutil.Ok(t, ioutil.WriteFile("test.md", buf.Bytes(), os.ModePerm))
 
 	exp, err := ioutil.ReadFile("testdata/formatted.md")
 	testutil.Ok(t, err)
 	testutil.Equals(t, string(exp), buf.String())
+
+	file2, err := os.OpenFile("testdata/formatted.md", os.O_RDONLY, 0)
+	testutil.Ok(t, err)
+	defer file2.Close()
+
+	buf2 := bytes.Buffer{}
+	testutil.Ok(t, f.FormatSingle(file2, &buf2))
+	testutil.Equals(t, string(exp), buf2.String())
 }
 
 type mockLinkTransformer struct{}
@@ -39,7 +46,7 @@ func (mockLinkTransformer) TransformDestination(docPath string, destination []by
 	return b.Bytes(), nil
 }
 
-func Test_FormatSingle_Transformers(t *testing.T) {
+func TestFormat_FormatSingle_Transformers(t *testing.T) {
 	file, err := os.OpenFile("testdata/not_formatted.md", os.O_RDONLY, 0)
 	testutil.Ok(t, err)
 	defer file.Close()
@@ -49,7 +56,6 @@ func Test_FormatSingle_Transformers(t *testing.T) {
 
 	buf := bytes.Buffer{}
 	testutil.Ok(t, f.FormatSingle(file, &buf))
-	//testutil.Ok(t, ioutil.WriteFile("test.md", buf.Bytes(), os.ModePerm))
 
 	exp, err := ioutil.ReadFile("testdata/formatted_and_transformed.md")
 	testutil.Ok(t, err)

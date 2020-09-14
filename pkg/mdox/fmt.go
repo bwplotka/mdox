@@ -12,7 +12,6 @@ import (
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/runutil"
-	"github.com/bwplotka/mdox/pkg/mdox/transformers"
 	"github.com/go-kit/kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/pkg/errors"
@@ -31,6 +30,10 @@ type FrontMatterTransformer interface {
 
 type LinkTransformer interface {
 	TransformDestination(docPath string, destination []byte) ([]byte, error)
+}
+
+type MetaCodeBlockTransformer interface {
+	TransformMetaCodeBlock(docPath string, destination []byte) ([]byte, error)
 }
 
 type format struct {
@@ -57,8 +60,17 @@ func WithLinkTransformer(l LinkTransformer) Option {
 
 func newDefaultFormat() *format {
 	return &format{
-		fm: transformers.RemoveFrontMatter{},
+		fm: RemoveFrontMatter{},
 	}
+}
+
+type RemoveFrontMatter struct{}
+
+func (RemoveFrontMatter) TransformFrontMatter(_ string, frontMatter map[string]interface{}) ([]byte, error) {
+	for k := range frontMatter {
+		delete(frontMatter, k)
+	}
+	return nil, nil
 }
 
 // Format formats given markdown files in-place.
@@ -91,11 +103,13 @@ func (f *format) FormatSingle(file *os.File, out io.Writer) error {
 	}
 	gm := goldmark.New(
 		goldmark.WithExtensions(
-			extension.Table,         // we need this to enable | tables |
-			extension.Strikethrough, // we need this to enable ~~strike~~
+			extension.Table,
+			extension.Strikethrough,
+			extension.TaskList,
+			extension.Linkify,
 		),
 		goldmark.WithParserOptions(
-			parser.WithAttribute(), // we need this to enable # headers {#custom-ids}
+			parser.WithAttribute(), // Enable # headers {#custom-ids}.
 			parser.WithASTTransformers(util.Prioritized(t, 10)),
 		),
 		goldmark.WithParserOptions(),
@@ -106,12 +120,10 @@ func (f *format) FormatSingle(file *os.File, out io.Writer) error {
 	if err != nil {
 		return errors.Wrapf(err, "read %v", file.Name())
 	}
-
 	content := b
 	frontMatter := map[string]interface{}{}
 	fm, err := pageparser.ParseFrontMatterAndContent(bytes.NewReader(b))
-	if err == nil {
-		// Log otherwise?
+	if err == nil && len(fm.FrontMatter) > 0 {
 		content = fm.Content
 		frontMatter = fm.FrontMatter
 	}
