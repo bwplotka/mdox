@@ -52,7 +52,7 @@ Commands:
 ## Contributing
 
 Any contributions are welcome! Just use GitHub Issues and Pull Requests as usual.
-We follow [Thanos Go coding style](https://thanos.io/contributing/coding-style-guide.md/) guide.
+We follow [Thanos Go coding style](https://thanos.io/tip/coding-style-guide.md/) guide.
 
 ## Initial Author
 
