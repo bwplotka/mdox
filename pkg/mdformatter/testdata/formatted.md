@@ -1,5 +1,4 @@
-Quick Tutorial
-==============
+# Quick Tutorial
 
 Feel free to check the free, in-browser interactive tutorial [as Katacoda Thanos Course](https://katacoda.com/bwplotka/courses/thanos) We will be progressively updating our Katacoda Course with more scenarios.
 
@@ -212,10 +211,7 @@ The compactor is not in the critical path of querying or data backup. It can eit
 
 In case of Prometheus with Thanos sidecar does not have enough retention, or if you want to have alerts or recording rules that requires global view, Thanos has just the component for that: the [Ruler](components/rule.md), which does rule and alert evaluation on top of a given Thanos Querier.
 
-Flags
------
-
-
+## Flags
 
 ```$
 usage: thanos rule [<flags>]
@@ -382,16 +378,13 @@ Flags:
                                  Interval between DNS resolutions.
 ```
 
-Configuration
--------------
+## Configuration
 
 ### Alertmanager
 
 The `--alertmanagers.config` and `--alertmanagers.config-file` flags allow specifying multiple Alertmanagers. Those entries are treated as a single HA group. This means that alert send failure is claimed only if the Ruler fails to send to all instances.
 
 The configuration format is the following:
-
-
 
 ```yaml
 alertmanagers:
