@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -20,10 +21,15 @@ type FlagClause interface {
 	Flag(name, help string) *kingpin.FlagClause
 }
 
-type Run func(ctx context.Context) error
+type ArgClause interface {
+	Arg(name, help string) *kingpin.ArgClause
+}
+
+type Run func(ctx context.Context, logger log.Logger) error
 
 type AppClause interface {
 	FlagClause
+	ArgClause
 	Command(cmd string, help string) AppClause
 	Flags() []*kingpin.FlagModel
 	Run(r Run)
@@ -61,6 +67,7 @@ func (a *App) Command(cmd string, help string) AppClause {
 	return &appClause{
 		c:          c,
 		FlagClause: c,
+		ArgClause:  c,
 		runs:       a.runs,
 		prefix:     cmd,
 	}
@@ -70,6 +77,7 @@ type appClause struct {
 	c *kingpin.CmdClause
 
 	FlagClause
+	ArgClause
 	runs   map[string]Run
 	prefix string
 }
@@ -79,6 +87,7 @@ func (a *appClause) Command(cmd string, help string) AppClause {
 	return &appClause{
 		c:          c,
 		FlagClause: c,
+		ArgClause:  c,
 		runs:       a.runs,
 		prefix:     a.prefix + " " + cmd,
 	}

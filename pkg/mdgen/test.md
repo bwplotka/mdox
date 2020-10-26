@@ -1,14 +1,25 @@
-Quick Tutorial
-==============
+# Quick Tutorial
 
-<meta mdox-flag-gen="bash ./pkg/mdox/testdata/out.sh">
-```bash
-a
+```bash mdox-gen-exec="bash ./testdata/out.sh"
+test output
 ```
-<meta mdox-cfg-go-gen="github.com/bwplotka/mdox/pkg/mdox/testdata.Config">
 
-Configuration
--------------
+```yaml mdox-gen-lang="go" mdox-gen-type="github.com/bwplotka/mdox/pkg/mdox/testdata.Config"
+ab
+ad
+```
+
+```yaml
+abc
+sad
+```
+
+```
+something
+sd
+```
+
+## Configuration
 
 ### Alertmanager
 
@@ -16,9 +27,7 @@ The `--alertmanagers.config` and `--alertmanagers.config-file` flags allow speci
 
 The configuration format is the following:
 
-<meta mdox-flag-gen="bash ./pkg/mdox/testdata/out2.sh">
-```yaml
-alertmanagers:
-- http_config:
-  api_version: v1
+```yaml mdox-gen-exec="bash ./testdata/out2.sh"
+test output2
+newline
 ```

@@ -4,7 +4,7 @@ import "github.com/prometheus/common/model"
 
 // Config stores the configuration for s3 bucket.
 type Config struct {
-	Bucket          string            `yaml:"bucket"`
+	Bucket          string            `yaml:"bucket" json:"bucket"`
 	Endpoint        string            `yaml:"endpoint"`
 	Region          string            `yaml:"region"`
 	AccessKey       string            `yaml:"access_key"`
@@ -29,7 +29,6 @@ type HTTPConfig struct {
 	ResponseHeaderTimeout model.Duration `yaml:"response_header_timeout"`
 	InsecureSkipVerify    bool           `yaml:"insecure_skip_verify"`
 }
-
 
 // SSEConfig deals with the configuration of SSE for Minio. The following options are valid:
 // kmsencryptioncontext == https://docs.aws.amazon.com/kms/latest/developerguide/services-s3.html#s3-encryption-context

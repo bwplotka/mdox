@@ -1,11 +1,13 @@
-package mdox
+package mdgen
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/testutil"
 )
 
@@ -14,10 +16,10 @@ func TestEmbed(t *testing.T) {
 	testutil.Ok(t, err)
 	defer file.Close()
 
-	f := newDefaultFormat()
+	f := mdformatter.New(context.Background(), mdformatter.WithCodeBlockTransformer(&genCodeBlockTransformer{}))
 
 	buf := bytes.Buffer{}
-	testutil.Ok(t, f.FormatSingle(file, &buf))
+	testutil.Ok(t, f.Format(file, &buf))
 	testutil.Ok(t, ioutil.WriteFile("test.md", buf.Bytes(), os.ModePerm))
 	//
 	//exp, err := ioutil.ReadFile("testdata/embed_in.md")

@@ -40,7 +40,7 @@ all: format build
 
 .PHONY: build
 build: ## Build mdox.
-	@echo ">> Building mdox"
+	@echo ">> building mdox"
 	@go install github.com/bwplotka/mdox
 
 .PHONY: check-comments
@@ -54,10 +54,8 @@ deps: ## Ensures fresh go.mod and go.sum.
 	@go mod verify
 
 .PHONY: docs
-docs: build $(EMBEDMD) ## Generates docs from flags.
-	@$(GOBIN)/statectl 2> statectl-help.txt
-	@$(EMBEDMD) -w *.md
-	@rm -f statectl-help.txt
+docs: build ## Generates config snippets and doc formatting.
+	@$(GOBIN)/mdox fmt *.md
 
 .PHONY: format
 format: ## Formats Go code including imports and cleans up white noise.
@@ -88,7 +86,7 @@ endif
 #      --mem-profile-path string   Path to memory profile output file
 # to debug big allocations during linting.
 lint: ## Runs various static analysis against our code.
-lint: $(FAILLINT) $(GOLANGCI_LINT) $(COPYRIGHT) $(MISSPELL) format docs check-git deps
+lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) format docs check-git deps
 	$(call require_clean_work_tree,"detected not clean master before running lint")
 	@echo ">> verifying modules being imported"
 	@$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
