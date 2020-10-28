@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/bwplotka/mdox/pkg/extkingpin"
+	"github.com/bwplotka/mdox/pkg/mdformatter"
+	"github.com/bwplotka/mdox/pkg/mdgen"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
-	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -44,17 +45,8 @@ func setupLogger(logLevel, logFormat string) log.Logger {
 	return log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 }
 
-// TODO(bwplotka): Move to separate repo once it's more generic. Document, version etc.
 func main() {
-	app := extkingpin.NewApp(kingpin.New(filepath.Base(os.Args[0]), `Markdown Project Documentation Toolbox.
-
-Features:
-* Prepare versioned docs formatted for static website. (TBD)
-* Generate docs from configuration structs and flags (TBD)
-* Format links to work well for website as well as raw markdown.
-* Check links.
-
-`).Version("yolo"))
+	app := extkingpin.NewApp(kingpin.New(filepath.Base(os.Args[0]), `Markdown Project Documentation Toolbox.`).Version("v0.0.0"))
 	logLevel := app.Flag("log.level", "Log filtering level.").
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use. Possible options: logfmt or json.").
@@ -62,6 +54,7 @@ Features:
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app)
+	registerWeb(ctx, app)
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
@@ -69,7 +62,7 @@ Features:
 	var g run.Group
 	g.Add(func() error {
 		// TODO(bwplotka): Move to customised better setup function.
-		return runner(nil, logger, nil, nil, nil, false)
+		return runner(ctx, logger)
 	}, func(err error) {
 		cancel()
 	})
@@ -104,30 +97,35 @@ func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	}
 }
 
-func registerFmt(ctx context.Context, app *extkingpin.App) {
-	cmd := app.Command("fmt", "Format Markdown docs.")
-	files := app.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
-	relLinksRes := app.Flag("links.rel-refs-regexp", "Regexp(es) for link references that should be relative link in order to have them work across different domains or platforms").Required().Strings()
-	// TODO: Output.
-	cmd.Setup(func(_ *run.Group, logger log.Logger, _ *prometheus.Registry, _ opentracing.Tracer, _ <-chan struct{}, _ bool) error {
-		root, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		return mdox.Format(ctx, logger, *files)
+func registerFmt(_ context.Context, app *extkingpin.App) {
+	cmd := app.Command("fmt", `
+Formats given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/).
+
+Additionally it supports special fenced code directives to autogenerate code snippets:
+
+	`+"```"+`<lang> mdox-gen-exec="<executable + arguments>"
+
+This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.
+
+Example: mdox fmt *.md
+`)
+	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
+
+	// TODO(bwplotka): Format markdown files, check and lint links for uniform styles. Adjust links?
+	cmd.Run(func(ctx context.Context, logger log.Logger) error {
+		return mdformatter.Format(ctx, logger, *files, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
 	})
 }
 
-func registerHugoFmt(ctx context.Context, app *extkingpin.App) {
-	cmd := app.Command("fmt", "Format Markdown docs.")
-	files := app.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
-	relLinksRes := app.Flag("links.rel-refs-regexp", "Regexp(es) for link references that should be relative link in order to have them work across different domains or platforms").Required().Strings()
-	// TODO: Output.
-	cmd.Setup(func(_ *run.Group, logger log.Logger, _ *prometheus.Registry, _ opentracing.Tracer, _ <-chan struct{}, _ bool) error {
-		root, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		return mdox.Format(ctx, logger, root, *files, *relLinksRes)
+func registerWeb(ctx context.Context, app *extkingpin.App) {
+	cmd := app.Command("web", "Tools for generating static HTML website based on https://gohugo.io/ on every PR with preview")
+	genCmd := cmd.Command("gen", "Generate versioned docs")
+
+	_ = genCmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
+
+	// TODO(bwplotka): Generate versioned docs used for Hugo. Open question: Hugo specific? How to adjust links? Should fmt and this be
+	// the same?
+	cmd.Run(func(ctx context.Context, logger log.Logger) error {
+		return errors.New("not implemented")
 	})
 }

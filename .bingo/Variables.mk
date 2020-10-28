@@ -16,12 +16,6 @@ GO     ?= $(shell which go)
 #	@echo "Running copyright"
 #	@$(COPYRIGHT) <flags/args..>
 #
-COPYRIGHT := $(GOBIN)/copyright-v0.9.0
-$(COPYRIGHT): .bingo/copyright.mod
-	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
-	@echo "(re)installing $(GOBIN)/copyright-v0.9.0"
-	@cd .bingo && $(GO) build -modfile=copyright.mod -o=$(GOBIN)/copyright-v0.9.0 "github.com/bwplotka/flagarize/scripts/copyright"
-
 EMBEDMD := $(GOBIN)/embedmd-v1.0.0
 $(EMBEDMD): .bingo/embedmd.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
