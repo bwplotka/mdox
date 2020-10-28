@@ -1,3 +1,6 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 package mdgen
 
 import (
@@ -87,5 +90,6 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, docPat
 }
 
 func genGo(ctx context.Context, moduleRoot string, typePath string) ([]byte, error) {
+	// TODO(bwplotka): To be done.
 	return nil, nil
 }

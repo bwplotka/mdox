@@ -156,7 +156,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		}
 	}
 
-	// hack: run Convert two times to ensure deterministic whitespace alignment.
+	// Hack: run Convert two times to ensure deterministic whitespace alignment.
 	// This also immediately show transformers which are not working well together etc.
 	tmp := bytes.Buffer{}
 	if err := gm.Convert(content, &tmp); err != nil {

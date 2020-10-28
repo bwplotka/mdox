@@ -1,4 +1,7 @@
-// Taken from Thanos
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
+// Taken from Thanos.
 //
 // Copyright (c) The Thanos Authors.
 // Licensed under the Apache License 2.0.
@@ -164,7 +167,7 @@ func ExhaustCloseWithErrCapture(err *error, r io.ReadCloser, format string, a ..
 // Errors used to construct it.
 type MultiError []error
 
-// Returns a concatenated string of the contained errors
+// Returns a concatenated string of the contained errors.
 func (es MultiError) Error() string {
 	var buf bytes.Buffer
 

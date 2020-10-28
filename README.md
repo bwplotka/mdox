@@ -1,14 +1,10 @@
 # mdox
 
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/bwplotka/mdox)
-[![Latest Release](https://img.shields.io/github/release/bwplotka/mdox.svg?style=flat-square)](https://github.com/bwplotka/mdox/releases/latest)
-[![CI](https://github.com/bwplotka/mdox/workflows/go/badge.svg)](https://github.com/bwplotka/mdox/actions?query=workflow%3Ago)
-[![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mdox)](https://goreportcard.com/report/github.com/bwplotka/mdox)
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/bwplotka/mdox) [![Latest Release](https://img.shields.io/github/release/bwplotka/mdox.svg?style=flat-square)](https://github.com/bwplotka/mdox/releases/latest) [![CI](https://github.com/bwplotka/mdox/workflows/go/badge.svg)](https://github.com/bwplotka/mdox/actions?query=workflow%3Ago) [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mdox)](https://goreportcard.com/report/github.com/bwplotka/mdox)
 
 CLI toolset for maintaining automated, high quality project documentation and website leveraging markdown and git.
 
-Goal: Allow projects to have self-updating up-to-date documentation available in both markdown (e.g readable from GitHub) and static HTML. Hosted in the same repository as code,
-fool-proof and integrated with Pull Requests CI and hosting CD. 
+Goal: Allow projects to have self-updating up-to-date documentation available in both markdown (e.g readable from GitHub) and static HTML. Hosted in the same repository as code, fool-proof and integrated with Pull Requests CI and hosting CD.
 
 ### Features
 
@@ -44,6 +40,8 @@ Commands:
 
   web gen <files>...
     Generate versioned docs
+
+
 ```
 
 ### Production Usage
@@ -67,8 +65,7 @@ or via [bingo](github.com/bwplotka/bingo) if want to pin it:
 bingo get -u github.com/bwplotka/mdox
 ```
 
-Any contributions are welcome! Just use GitHub Issues and Pull Requests as usual.
-We follow [Thanos Go coding style](https://thanos.io/contributing/coding-style-guide.md/) guide.
+Any contributions are welcome! Just use GitHub Issues and Pull Requests as usual. We follow [Thanos Go coding style](https://thanos.io/contributing/coding-style-guide.md/) guide.
 
 ## Initial Author
 

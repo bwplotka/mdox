@@ -4,10 +4,10 @@ FILES_TO_FMT      ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print
 GO111MODULE       ?= on
 export GO111MODULE
 
-GOBIN             ?= $(firstword $(subst :, ,${GOPATH}))/bin
+GOBIN ?= $(firstword $(subst :, ,${GOPATH}))/bin
 
 # Tools.
-GIT               ?= $(shell which git)
+GIT ?= $(shell which git)
 
 # Support gsed on OSX (installed via brew), falling back to sed. On Linux
 # systems gsed won't be installed, so will use sed as expected.
@@ -41,7 +41,7 @@ all: format build
 .PHONY: build
 build: ## Build mdox.
 	@echo ">> building mdox"
-	@go install github.com/bwplotka/mdox
+	@GOBIN=$(GOBIN) go install github.com/bwplotka/mdox
 
 .PHONY: check-comments
 check-comments: ## Checks Go code comments if they have trailing period (excludes protobuffers and vendor files). Comments with more than 3 spaces at beginning are omitted from the check, example: '//    - foo'.
@@ -55,7 +55,8 @@ deps: ## Ensures fresh go.mod and go.sum.
 
 .PHONY: docs
 docs: build ## Generates config snippets and doc formatting.
-	@$(GOBIN)/mdox fmt *.md
+	@echo ">> generating docs $(PATH)"
+	@PATH=$(GOBIN) mdox fmt *.md
 
 .PHONY: format
 format: ## Formats Go code including imports and cleans up white noise.
@@ -86,7 +87,7 @@ endif
 #      --mem-profile-path string   Path to memory profile output file
 # to debug big allocations during linting.
 lint: ## Runs various static analysis against our code.
-lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) format docs check-git deps
+lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) build format docs check-git deps
 	$(call require_clean_work_tree,"detected not clean master before running lint")
 	@echo ">> verifying modules being imported"
 	@$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
@@ -101,4 +102,4 @@ lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) format docs check-git deps
 	@find . -type f \( -name "*.md" -o -name "*.go" \) | SED_BIN="$(SED)" xargs scripts/cleanup-white-noise.sh
 	@echo ">> ensuring Copyright headers"
 	@go run ./scripts/copyright/...
-	$(call require_clean_work_tree,"detected white noise or/and files without copyright; run 'make lint' file and commit changes.")
+	$(call require_clean_work_tree,"detected white noise or/and files without copyright; run make lint file and commit changes.")

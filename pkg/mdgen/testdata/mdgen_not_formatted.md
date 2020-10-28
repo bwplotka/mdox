@@ -1,14 +1,13 @@
 Quick Tutorial
 ==============
 
-```bash mdox-gen-exec="bash ./testdata/out.sh" 
+```bash mdox-gen-exec="bash ./testdata/out.sh"
 a
 adf
 ```
 
 ```yaml mdox-gen-lang="go" mdox-gen-type="github.com/bwplotka/mdox/pkg/mdox/testdata.Config"
-ab
-ad
+TO BE DONE
 ```
 
 ```yaml

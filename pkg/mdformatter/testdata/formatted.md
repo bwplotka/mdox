@@ -376,6 +376,7 @@ Flags:
                                  (used as a fallback)
       --query.sd-dns-interval=30s
                                  Interval between DNS resolutions.
+
 ```
 
 ## Configuration

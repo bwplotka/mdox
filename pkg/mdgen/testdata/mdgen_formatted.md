@@ -5,8 +5,7 @@ test output
 ```
 
 ```yaml mdox-gen-lang="go" mdox-gen-type="github.com/bwplotka/mdox/pkg/mdox/testdata.Config"
-ab
-ad
+TO BE DONE
 ```
 
 ```yaml
