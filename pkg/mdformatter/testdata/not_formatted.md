@@ -13,6 +13,9 @@ We will be progressively updating our Katacoda Course with more scenarios.
 
 On top of this feel free to go through our tutorial presented here:
 
+Yolo link https://thanos.io/some
+Yolo email something@gmail.com
+
 ### Prometheus
 
 Thanos is based on Prometheus. With Thanos you use more or less Prometheus features depending on the deployment model, however

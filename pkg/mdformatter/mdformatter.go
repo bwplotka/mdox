@@ -11,6 +11,8 @@ import (
 	"os"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/bwplotka/mdox/pkg/gitdiff"
+	"github.com/bwplotka/mdox/pkg/merrors"
 	"github.com/bwplotka/mdox/pkg/runutil"
 	"github.com/go-kit/kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
@@ -22,14 +24,17 @@ import (
 
 type FrontMatterTransformer interface {
 	TransformFrontMatter(ctx context.Context, docPath string, frontMatter map[string]interface{}) ([]byte, error)
+	io.Closer
 }
 
 type LinkTransformer interface {
 	TransformDestination(ctx context.Context, docPath string, destination []byte) ([]byte, error)
+	io.Closer
 }
 
 type CodeBlockTransformer interface {
 	TransformCodeBlock(ctx context.Context, docPath string, infoString []byte, code []byte) ([]byte, error)
+	io.Closer
 }
 
 type Formatter struct {
@@ -84,17 +89,21 @@ func (RemoveFrontMatter) TransformFrontMatter(_ context.Context, _ string, front
 	return nil, nil
 }
 
-// Format formats given markdown files in-place. Check `With...` function to see what modifiers you can add.
+func (RemoveFrontMatter) Close() error { return nil }
+
+// Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
 func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
 	f := New(ctx, opts...)
 
 	b := bytes.Buffer{}
 	// TODO(bwplotka): Do Concurrently.
+
+	errs := merrors.New()
 	for _, fn := range files {
-		if err := func() error {
+		errs.Add(func() error {
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
-				return errors.Wrapf(err, "read %v", fn)
+				return errors.Wrapf(err, "open %v", fn)
 			}
 			defer runutil.CloseWithLogOnErr(logger, file, "close file %v", fn)
 
@@ -105,14 +114,65 @@ func Format(ctx context.Context, logger log.Logger, files []string, opts ...Opti
 
 			n, err := file.WriteAt(b.Bytes(), 0)
 			if err != nil {
-				return errors.Wrapf(err, "write: %v", fn)
+				return errors.Wrapf(err, "write %v", fn)
 			}
 			return file.Truncate(int64(n))
-		}(); err != nil {
-			return err
-		}
+		}())
 	}
-	return nil
+	return errs.Err()
+}
+
+type Diffs []gitdiff.Diff
+
+func (d Diffs) String() string {
+	if len(d) == 0 {
+		return "files the same; no diff"
+	}
+
+	b := bytes.Buffer{}
+	for _, diff := range d {
+		_, _ = b.Write(diff.ToCombinedFormat())
+	}
+	return b.String()
+}
+
+// IsFormatted tries to formats given markdown files and return Diff if files are not formatted.
+// If diff is empty it means all files are formatted.
+func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ...Option) (diffs Diffs, err error) {
+	f := New(ctx, opts...)
+	b := bytes.Buffer{}
+
+	// TODO(bwplotka): Do Concurrently.
+	errs := merrors.New()
+	for _, fn := range files {
+		errs.Add(func() error {
+			file, err := os.OpenFile(fn, os.O_RDWR, 0)
+			if err != nil {
+				return errors.Wrapf(err, "open %v", fn)
+			}
+			defer runutil.CloseWithLogOnErr(logger, file, "close file %v", fn)
+
+			b.Reset()
+			if err := f.Format(file, &b); err != nil {
+				return err
+			}
+
+			if _, err := file.Seek(0, 0); err != nil {
+				return err
+			}
+
+			in, err := ioutil.ReadAll(file)
+			if err != nil {
+				return errors.Wrapf(err, "read all %v", fn)
+			}
+
+			if !bytes.Equal(in, b.Bytes()) {
+				diffs = append(diffs, gitdiff.CompareBytes(in, fn, b.Bytes(), fn+" (formatted)"))
+			}
+			return nil
+		}())
+	}
+	return diffs, errs.Err()
 }
 
 // Format writes formatted input file into out writer.
@@ -122,7 +182,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		f:       f,
 		docPath: file.Name(),
 	}
-	gm := goldmark.New(
+	gm1 := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
 		),
@@ -132,6 +192,18 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		),
 		goldmark.WithParserOptions(),
 		goldmark.WithRenderer(nopOpsRenderer{Renderer: t}),
+	)
+
+	gm2 := goldmark.New(
+		goldmark.WithExtensions(
+			extension.GFM,
+		),
+		goldmark.WithParserOptions(
+			parser.WithAttribute(), // Enable # headers {#custom-ids}.
+			parser.WithHeadingAttribute(),
+		),
+		goldmark.WithParserOptions(),
+		goldmark.WithRenderer(markdown.NewRenderer()),
 	)
 
 	b, err := ioutil.ReadAll(file)
@@ -154,17 +226,22 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		if _, err := out.Write(hdr); err != nil {
 			return err
 		}
+		if err := f.fm.Close(); err != nil {
+			return err
+		}
 	}
 
 	// Hack: run Convert two times to ensure deterministic whitespace alignment.
 	// This also immediately show transformers which are not working well together etc.
 	tmp := bytes.Buffer{}
-	if err := gm.Convert(content, &tmp); err != nil {
-		return errors.Wrapf(err, "Formatter %v", f)
+	if err := gm1.Convert(content, &tmp); err != nil {
+		return errors.Wrapf(err, "first formatting phase for %v", file.Name())
 	}
-
-	if err := gm.Convert(tmp.Bytes(), out); err != nil {
-		return errors.Wrapf(err, "Formatter %v", f)
+	if err := t.Close(); err != nil {
+		return err
+	}
+	if err := gm2.Convert(tmp.Bytes(), out); err != nil {
+		return errors.Wrapf(err, "second formatting phase for %v", file.Name())
 	}
 	return nil
 }

@@ -13,7 +13,8 @@ import (
 
 	"github.com/bwplotka/mdox/pkg/extkingpin"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/bwplotka/mdox/pkg/mdgen"
+	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
+	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -44,8 +45,7 @@ func setupLogger(logLevel, logFormat string) log.Logger {
 	if logFormat == logFormatJson {
 		logger = log.NewJSONLogger(log.NewSyncWriter(os.Stderr))
 	}
-	logger = level.NewFilter(logger, lvl)
-	return log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+	return level.NewFilter(logger, lvl)
 }
 
 func main() {
@@ -81,8 +81,12 @@ func main() {
 	}
 
 	if err := g.Run(); err != nil {
-		// Use %+v for github.com/pkg/errors error to print with stack.
-		level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
+		if *logLevel == "debug" {
+			// Use %+v for github.com/pkg/errors error to print with stack.
+			level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
+			os.Exit(1)
+		}
+		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
 		os.Exit(1)
 	}
 	level.Info(logger).Log("msg", "exiting")
@@ -101,20 +105,65 @@ func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 }
 
 func registerFmt(_ context.Context, app *extkingpin.App) {
-	cmd := app.Command("fmt", `
-Formats given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/).
-
-Additionally it supports special fenced code directives to autogenerate code snippets:
-
-	`+"```"+`<lang> mdox-gen-exec="<executable + arguments>"
-
-This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.
-
-Example: mdox fmt *.md
-`)
+	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
-	cmd.Run(func(ctx context.Context, logger log.Logger) error {
-		return mdformatter.Format(ctx, logger, *files, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
+	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
+
+	disableGenCodeBlocksDirectives := cmd.Flag("code.disable-directives", `If false, fmt will parse custom fenced code directives prefixed with 'mdox-gen' to autogenerate code snippets. For example:
+	`+"```"+`<lang> mdox-gen-exec="<executable + arguments>"
+This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.`).Bool()
+	linksAnchorDir := cmd.Flag("links.anchor-dir", "Anchor directory for link transformers. PWD flag is not specified.").ExistingDir()
+	linksLocaliseForAddress := cmd.Flag("links.localise.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists)."+
+		"Absolute path links will be converted to relative links to anchor dri as well.").Regexp()
+	// TODO(bwplotka): Add cache in file?
+	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
+	linksValidateExceptDomains := cmd.Flag("links.validate.address-regex", "If specified, all links will be validated, except those matching the given target address.").Default(`^$`).Regexp()
+
+	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
+		var opts []mdformatter.Option
+		if !*disableGenCodeBlocksDirectives {
+			opts = append(opts, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
+		}
+
+		if len(*files) == 0 {
+			return errors.New("no files to format")
+		}
+
+		for i := range *files {
+			(*files)[i], err = filepath.Abs((*files)[i])
+			if err != nil {
+				return err
+			}
+		}
+
+		anchorDir, err := linktransformer.GetAnchorDir(*linksAnchorDir, *files)
+		if err != nil {
+			return err
+		}
+
+		var linkTr []mdformatter.LinkTransformer
+		if *linksLocaliseForAddress != nil {
+			linkTr = append(linkTr, linktransformer.NewLocalizer(logger, *linksLocaliseForAddress, anchorDir))
+		}
+		if *linksValidateEnabled {
+			linkTr = append(linkTr, linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir))
+		}
+
+		if len(linkTr) > 0 {
+			opts = append(opts, mdformatter.WithLinkTransformer(linktransformer.NewChain(linkTr...)))
+		}
+
+		if *checkOnly {
+			diff, err := mdformatter.IsFormatted(ctx, logger, *files, opts...)
+			if err != nil {
+				return err
+			}
+			if len(diff) == 0 {
+				return nil
+			}
+			return errors.Errorf("files not formatted: %v", diff.String())
+		}
+		return mdformatter.Format(ctx, logger, *files, opts...)
 	})
 }
 

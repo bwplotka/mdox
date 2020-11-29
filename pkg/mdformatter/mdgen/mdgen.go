@@ -26,7 +26,7 @@ func NewCodeBlockTransformer() *genCodeBlockTransformer {
 	return &genCodeBlockTransformer{}
 }
 
-func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, docPath string, infoString []byte, code []byte) ([]byte, error) {
+func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, _ string, infoString []byte, code []byte) ([]byte, error) {
 	if len(infoString) == 0 {
 		return code, nil
 	}
@@ -88,6 +88,8 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, docPat
 	}
 	panic("should never get here")
 }
+
+func (t *genCodeBlockTransformer) Close() error { return nil }
 
 func genGo(ctx context.Context, moduleRoot string, typePath string) ([]byte, error) {
 	// TODO(bwplotka): To be done.

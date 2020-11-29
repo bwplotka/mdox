@@ -4,8 +4,10 @@
 package mdformatter
 
 import (
+	"bytes"
 	"io"
 
+	"github.com/bwplotka/mdox/pkg/merrors"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
@@ -37,28 +39,38 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 		var err error
 		switch typedNode := n.(type) {
 		case *ast.Link:
-			if t.f.link == nil {
+			if !entering || t.f.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			if entering {
-				typedNode.Destination, err = t.f.link.TransformDestination(t.f.ctx, t.docPath, typedNode.Destination)
-				if err != nil {
-					return ast.WalkStop, err
-				}
+			typedNode.Destination, err = t.f.link.TransformDestination(t.f.ctx, t.docPath, typedNode.Destination)
+			if err != nil {
+				return ast.WalkStop, err
 			}
+		case *ast.AutoLink:
+			if !entering || t.f.link == nil || typedNode.AutoLinkType != ast.AutoLinkURL {
+				return ast.WalkSkipChildren, nil
+			}
+			dest, err := t.f.link.TransformDestination(t.f.ctx, t.docPath, typedNode.URL(source))
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if bytes.Equal(dest, typedNode.URL(source)) {
+				return ast.WalkSkipChildren, nil
+			}
+			repl := ast.NewString(dest)
+			repl.SetParent(n)
+			n.Parent().ReplaceChild(n.Parent(), n, repl)
 		case *ast.FencedCodeBlock:
-			if t.f.cb == nil || typedNode.Info == nil {
+			if !entering || t.f.cb == nil || typedNode.Info == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			if entering {
-				blockContent, err := t.f.cb.TransformCodeBlock(t.f.ctx, t.docPath, typedNode.Info.Text(source), typedNode.Text(source))
-				if err != nil {
-					return ast.WalkStop, err
-				}
-				if blockContent != nil {
-					replaceContent(&typedNode.BaseBlock, len(source), blockContent)
-					source = append(source, blockContent...)
-				}
+			blockContent, err := t.f.cb.TransformCodeBlock(t.f.ctx, t.docPath, typedNode.Info.Text(source), typedNode.Text(source))
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if blockContent != nil {
+				replaceContent(&typedNode.BaseBlock, len(source), blockContent)
+				source = append(source, blockContent...)
 			}
 		default:
 			return ast.WalkContinue, nil
@@ -68,6 +80,17 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 		return err
 	}
 	return t.wrapped.Render(w, source, node)
+}
+
+func (t *transformer) Close() error {
+	errs := merrors.New()
+	if t.f.link != nil {
+		errs.Add(t.f.link.Close())
+	}
+	if t.f.cb != nil {
+		errs.Add(t.f.cb.Close())
+	}
+	return errs.Err()
 }
 
 func replaceContent(b *ast.BaseBlock, lastSegmentStop int, content []byte) {

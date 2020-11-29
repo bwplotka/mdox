@@ -56,14 +56,13 @@ deps: ## Ensures fresh go.mod and go.sum.
 .PHONY: docs
 docs: build ## Generates config snippets and doc formatting.
 	@echo ">> generating docs $(PATH)"
-	@PATH=$(GOBIN) mdox fmt *.md
+	@PATH=$(GOBIN) mdox fmt -l *.md
 
 .PHONY: format
-format: ## Formats Go code including imports and cleans up white noise.
+format: ## Formats Go code.
 format: $(GOIMPORTS)
 	@echo ">> formatting code"
 	@$(GOIMPORTS) -w $(FILES_TO_FMT)
-	@SED_BIN="$(SED)" scripts/cleanup-white-noise.sh $(FILES_TO_FMT)
 
 .PHONY: test
 test: ## Runs all Go unit tests.
@@ -90,7 +89,7 @@ lint: ## Runs various static analysis against our code.
 lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) build format docs check-git deps
 	$(call require_clean_work_tree,"detected not clean master before running lint")
 	@echo ">> verifying modules being imported"
-	@$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
+	#TODO(bwplotka): Uncomment once we upstream merrors package: @$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
 	@$(FAILLINT) -paths "fmt.{Print,PrintfPrintln,Sprint}" -ignore-tests ./...
 	@echo ">> examining all of the Go files"
 	@go vet -stdmethods=false ./...
@@ -98,8 +97,6 @@ lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) build format docs check-git deps
 	@$(GOLANGCI_LINT) run
 	@echo ">> detecting misspells"
 	@find . -type f | grep -v vendor/ | grep -vE '\./\..*' | xargs $(MISSPELL) -error
-	@echo ">> detecting white noise"
-	@find . -type f \( -name "*.md" -o -name "*.go" \) | SED_BIN="$(SED)" xargs scripts/cleanup-white-noise.sh
 	@echo ">> ensuring Copyright headers"
 	@go run ./scripts/copyright/...
-	$(call require_clean_work_tree,"detected white noise or/and files without copyright; run make lint file and commit changes.")
+	$(call require_clean_work_tree,"detected files without copyright; run make lint file and commit changes.")
