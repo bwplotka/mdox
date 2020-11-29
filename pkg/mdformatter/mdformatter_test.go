@@ -23,13 +23,13 @@ func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 	exp, err := ioutil.ReadFile("testdata/formatted.md")
 	testutil.Ok(t, err)
 
-	t.Run("Formatter not formatted", func(t *testing.T) {
+	t.Run("Format not formatted", func(t *testing.T) {
 		buf := bytes.Buffer{}
 		testutil.Ok(t, f.Format(file, &buf))
 		testutil.Equals(t, string(exp), buf.String())
 	})
 
-	t.Run("Formatter formatted", func(t *testing.T) {
+	t.Run("Format formatted", func(t *testing.T) {
 		file2, err := os.OpenFile("testdata/formatted.md", os.O_RDONLY, 0)
 		testutil.Ok(t, err)
 		defer file2.Close()
@@ -62,10 +62,22 @@ func TestFormat_FormatSingle_Transformers(t *testing.T) {
 	f := New(context.Background())
 	f.link = mockLinkTransformer{}
 
-	buf := bytes.Buffer{}
-	testutil.Ok(t, f.Format(file, &buf))
-
 	exp, err := ioutil.ReadFile("testdata/formatted_and_transformed.md")
 	testutil.Ok(t, err)
-	testutil.Equals(t, string(exp), buf.String())
+
+	t.Run("Format not formatted", func(t *testing.T) {
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+
+	t.Run("Format formatted", func(t *testing.T) {
+		file2, err := os.OpenFile("testdata/formatted_and_transformed.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file2.Close()
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file2, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
 }

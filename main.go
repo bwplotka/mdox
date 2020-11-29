@@ -1,3 +1,6 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 package main
 
 import (
@@ -61,7 +64,7 @@ func main() {
 
 	var g run.Group
 	g.Add(func() error {
-		// TODO(bwplotka): Move to customised better setup function.
+		// TODO(bwplotka): Move to customized better setup function.
 		return runner(ctx, logger)
 	}, func(err error) {
 		cancel()
@@ -110,14 +113,12 @@ This directive runs executable with arguments and put its stderr and stdout outp
 Example: mdox fmt *.md
 `)
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
-
-	// TODO(bwplotka): Format markdown files, check and lint links for uniform styles. Adjust links?
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
 		return mdformatter.Format(ctx, logger, *files, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
 	})
 }
 
-func registerWeb(ctx context.Context, app *extkingpin.App) {
+func registerWeb(_ context.Context, app *extkingpin.App) {
 	cmd := app.Command("web", "Tools for generating static HTML website based on https://gohugo.io/ on every PR with preview")
 	genCmd := cmd.Command("gen", "Generate versioned docs")
 

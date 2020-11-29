@@ -18,4 +18,4 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
-replace github.com/Kunde21/markdownfmt/v2 => github.com/bwplotka/markdownfmt/v2 v2.0.0-20201027235426-cd85d2653c78
+replace github.com/Kunde21/markdownfmt/v2 => github.com/bwplotka/markdownfmt/v2 v2.0.0-20201129164736-749754008490

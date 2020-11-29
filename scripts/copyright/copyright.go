@@ -37,13 +37,10 @@ func applyLicenseToProtoAndGo() error {
 		if strings.HasSuffix(path, ".pb.go") {
 			return nil
 		}
-		//if (filepath.Ext(path) != ".proto" && filepath.Ext(path) != ".go") ||
-		//	// We copied this file and we want maintain its license (MIT).
-		//	path == "pkg/testutil/testutil.go" ||
-		//	// Generated file.
-		//	path == "pkg/ui/bindata.go" {
-		//	return nil
-		//}
+
+		if filepath.Ext(path) != ".proto" && filepath.Ext(path) != ".go" {
+			return nil
+		}
 
 		b, err := ioutil.ReadFile(path)
 		if err != nil {
