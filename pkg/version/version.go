@@ -4,4 +4,4 @@
 package version
 
 // Version returns 'mdox' version.
-const Version = "v0.1.0"
+const Version = "v0.2.0-dev"
