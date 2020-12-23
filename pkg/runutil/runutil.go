@@ -55,13 +55,13 @@
 package runutil
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/bwplotka/mdox/pkg/merrors"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
@@ -141,12 +141,7 @@ func ExhaustCloseWithLogOnErr(logger log.Logger, r io.ReadCloser, format string,
 // CloseWithErrCapture runs function and on error return error by argument including the given error (usually
 // from caller function).
 func CloseWithErrCapture(err *error, closer io.Closer, format string, a ...interface{}) {
-	merr := MultiError{}
-
-	merr.Add(*err)
-	merr.Add(errors.Wrapf(closer.Close(), format, a...))
-
-	*err = merr.Err()
+	*err = merrors.New(*err, errors.Wrapf(closer.Close(), format, a...)).Err()
 }
 
 // ExhaustCloseWithErrCapture closes the io.ReadCloser with error capture but exhausts the reader before.
@@ -156,51 +151,5 @@ func ExhaustCloseWithErrCapture(err *error, r io.ReadCloser, format string, a ..
 	CloseWithErrCapture(err, r, format, a...)
 
 	// Prepend the io.Copy error.
-	merr := MultiError{}
-	merr.Add(copyErr)
-	merr.Add(*err)
-
-	*err = merr.Err()
-}
-
-// The MultiError type implements the error interface, and contains the
-// Errors used to construct it.
-type MultiError []error
-
-// Returns a concatenated string of the contained errors.
-func (es MultiError) Error() string {
-	var buf bytes.Buffer
-
-	if len(es) > 1 {
-		fmt.Fprintf(&buf, "%d errors: ", len(es))
-	}
-
-	for i, err := range es {
-		if i != 0 {
-			buf.WriteString("; ")
-		}
-		buf.WriteString(err.Error())
-	}
-
-	return buf.String()
-}
-
-// Add adds the error to the error list if it is not nil.
-func (es *MultiError) Add(err error) {
-	if err == nil {
-		return
-	}
-	if merr, ok := err.(MultiError); ok {
-		*es = append(*es, merr...)
-	} else {
-		*es = append(*es, err)
-	}
-}
-
-// Err returns the error list as an error or nil if it is empty.
-func (es MultiError) Err() error {
-	if len(es) == 0 {
-		return nil
-	}
-	return es
+	*err = merrors.New(copyErr, *err).Err()
 }

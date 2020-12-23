@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/testutil"
+	"github.com/go-kit/kit/log"
 )
 
 func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
@@ -40,9 +41,25 @@ func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 	})
 }
 
-type mockLinkTransformer struct{}
+func TestCheck_NoTransformers(t *testing.T) {
+	diff, err := IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/formatted.md"})
+	testutil.Ok(t, err)
+	testutil.Equals(t, 0, len(diff))
+	testutil.Equals(t, "files the same; no diff", diff.String())
 
-func (mockLinkTransformer) TransformDestination(_ context.Context, docPath string, destination []byte) ([]byte, error) {
+	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted.md"})
+	testutil.Ok(t, err)
+
+	exp, err := ioutil.ReadFile("testdata/not_formatted.md.diff")
+	testutil.Ok(t, err)
+	testutil.Equals(t, string(exp), diff.String())
+}
+
+type mockLinkTransformer struct {
+	closed bool
+}
+
+func (*mockLinkTransformer) TransformDestination(_ context.Context, docPath string, destination []byte) ([]byte, error) {
 	if bytes.HasPrefix(destination, []byte("$$-")) {
 		return destination, nil
 	}
@@ -54,13 +71,19 @@ func (mockLinkTransformer) TransformDestination(_ context.Context, docPath strin
 	return b.Bytes(), nil
 }
 
+func (m *mockLinkTransformer) Close() error {
+	m.closed = true
+	return nil
+}
+
 func TestFormat_FormatSingle_Transformers(t *testing.T) {
 	file, err := os.OpenFile("testdata/not_formatted.md", os.O_RDONLY, 0)
 	testutil.Ok(t, err)
 	defer file.Close()
 
+	m := &mockLinkTransformer{}
 	f := New(context.Background())
-	f.link = mockLinkTransformer{}
+	f.link = m
 
 	exp, err := ioutil.ReadFile("testdata/formatted_and_transformed.md")
 	testutil.Ok(t, err)
@@ -80,4 +103,6 @@ func TestFormat_FormatSingle_Transformers(t *testing.T) {
 		testutil.Ok(t, f.Format(file2, &buf))
 		testutil.Equals(t, string(exp), buf.String())
 	})
+
+	testutil.Equals(t, true, m.closed)
 }
