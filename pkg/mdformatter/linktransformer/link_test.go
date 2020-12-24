@@ -179,7 +179,12 @@ func TestValidator_TransformDestination(t *testing.T) {
 			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, "found 4 problems with links.", err.Error())
+		testutil.Equals(t, fmt.Sprintf("%v/repo/docs/test/invalid-local-links.md: 4 errors: "+
+			"link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
+			"link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
+			"link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
+			"link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
+			tmpDir, tmpDir, tmpDir, tmpDir, tmpDir), err.Error())
 	})
 
 	t.Run("check 404 link", func(t *testing.T) {
@@ -194,7 +199,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, "found 1 problems with links.", err.Error())
+		testutil.Equals(t, tmpDir+"/repo/docs/test/invalid-link.md: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", err.Error())
 	})
 
 	t.Run("check 404 link, ignored", func(t *testing.T) {
@@ -210,26 +215,4 @@ func TestValidator_TransformDestination(t *testing.T) {
 		))
 		testutil.Ok(t, err)
 	})
-}
-
-func TestGetAnchorDir(t *testing.T) {
-	pwd, err := os.Getwd()
-	testutil.Ok(t, err)
-
-	// Consider parametrizing this.
-	anchorDir, err := GetAnchorDir("", []string{})
-	testutil.Ok(t, err)
-	testutil.Equals(t, pwd, anchorDir)
-
-	anchorDir, err = GetAnchorDir("/root", []string{})
-	testutil.Ok(t, err)
-	testutil.Equals(t, "/root", anchorDir)
-
-	_, err = GetAnchorDir("/root", []string{"/root/something.md", "/home/something/file.md", "/root/a/b/c/file.md"})
-	testutil.NotOk(t, err)
-	testutil.Equals(t, "anchorDir \"/root\" is not in path of provided file \"/home/something/file.md\"", err.Error())
-
-	_, err = GetAnchorDir("/root", []string{"/root/something.md", "/root/something/file.md", "/root/a/b/c/file.md"})
-	testutil.Ok(t, err)
-	testutil.Equals(t, "/root", anchorDir)
 }

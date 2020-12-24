@@ -6,12 +6,13 @@ package linktransformer
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/merrors"
@@ -23,6 +24,13 @@ import (
 
 var remoteLinkPrefixRe = regexp.MustCompile(`^http[s]?://`)
 
+type LookupError error
+
+var (
+	FileNotFoundErr = LookupError(errors.New("file not found"))
+	IDNotFoundErr   = LookupError(errors.New("file exists, but does not have such id"))
+)
+
 type chain struct {
 	chain []mdformatter.LinkTransformer
 }
@@ -31,9 +39,9 @@ func NewChain(c ...mdformatter.LinkTransformer) mdformatter.LinkTransformer {
 	return &chain{chain: c}
 }
 
-func (l *chain) TransformDestination(ctx context.Context, docPath string, destination []byte) (_ []byte, err error) {
+func (l *chain) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
 	for _, c := range l.chain {
-		destination, err = c.TransformDestination(ctx, docPath, destination)
+		destination, err = c.TransformDestination(ctx, destination)
 		if err != nil {
 			return nil, err
 		}
@@ -41,10 +49,10 @@ func (l *chain) TransformDestination(ctx context.Context, docPath string, destin
 	return destination, nil
 }
 
-func (l *chain) Close() error {
+func (l *chain) Close(ctx mdformatter.SourceContext) error {
 	errs := merrors.New()
 	for _, c := range l.chain {
-		errs.Add(c.Close())
+		errs.Add(c.Close(ctx))
 	}
 	return errs.Err()
 }
@@ -63,7 +71,7 @@ func NewLocalizer(logger log.Logger, address *regexp.Regexp, anchorDir string) m
 	return &localizer{logger: logger, address: address, anchorDir: anchorDir, localLinksByFile: map[string]*[]string{}}
 }
 
-func (l *localizer) TransformDestination(_ context.Context, docPath string, destination []byte) (_ []byte, err error) {
+func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
 	matches := remoteLinkPrefixRe.FindAllIndex(destination, 1)
 	if matches != nil {
 		// URLs. Remove http/https prefix.
@@ -81,123 +89,135 @@ func (l *localizer) TransformDestination(_ context.Context, docPath string, dest
 			return destination, nil
 		}
 		// NOTE: This assumes GetAnchorDir was used, so we validated if docPath is in the path of anchorDir.
-		return absLinkToRelLink(newDest, docPath)
+		return absLinkToRelLink(newDest, ctx.Filepath)
 	}
 
 	// Relative or absolute path.
-	newDest := absLocalLink(l.anchorDir, docPath, string(destination))
+	newDest := absLocalLink(l.anchorDir, ctx.Filepath, string(destination))
 
 	if err := l.localLinksByFile.Lookup(newDest); err != nil {
 		level.Debug(l.logger).Log("msg", "attempted localization failed, no such local link; skipping", "err", err)
 		return destination, nil
 	}
 	// NOTE: This assumes GetAnchorDir was used, so we validated if docPath is in the path of anchorDir.
-	return absLinkToRelLink(newDest, docPath)
+	return absLinkToRelLink(newDest, ctx.Filepath)
 }
 
-func (l *localizer) Close() error {
-	return nil
-}
+func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
 
 type validator struct {
-	localLinksByFile localLinksCache
-	anchorDir        string
+	logger    log.Logger
+	anchorDir string
+	except    *regexp.Regexp
 
-	except *regexp.Regexp
-	c      *colly.Collector
+	localLinks  localLinksCache
+	remoteLinks map[string]error
+	c           *colly.Collector
 
-	errs   *merrors.NilOrMultiError
-	logger log.Logger
+	future      sync.Mutex
+	destFutures map[futureKey]*futureResult
+}
+
+type futureKey struct {
+	filepath, dest string
+}
+
+type futureResult struct {
+	// function giving result, promised after colly.Wait.
+	resultFn func() error
+	cases    int
 }
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) mdformatter.LinkTransformer {
-	c := colly.NewCollector(colly.Async())
-	errs := merrors.New()
-	c.OnError(func(response *colly.Response, err error) {
-		errs.Add(errors.Wrapf(err, "link %q; status code %v", response.Request.URL.String(), response.StatusCode))
+	v := &validator{
+		logger:      logger,
+		anchorDir:   anchorDir,
+		except:      except,
+		localLinks:  map[string]*[]string{},
+		remoteLinks: map[string]error{},
+		c:           colly.NewCollector(colly.Async()),
+		destFutures: map[futureKey]*futureResult{},
+	}
+	v.c.OnScraped(func(response *colly.Response) {
+		v.remoteLinks[response.Request.URL.String()] = nil
 	})
-	return &validator{logger: logger, c: c, errs: errs, except: except, localLinksByFile: map[string]*[]string{}, anchorDir: anchorDir}
+	v.c.OnError(func(response *colly.Response, err error) {
+		v.remoteLinks[response.Request.URL.String()] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+	})
+	return v
 }
 
-func (l *validator) TransformDestination(_ context.Context, docPath string, destination []byte) (_ []byte, err error) {
-	if l.except.Match(destination) {
-		return destination, nil
-	}
-
-	matches := remoteLinkPrefixRe.FindAllIndex(destination, 1)
-	if matches == nil {
-		// Relative or absolute path. Check if exists.
-		newDest := absLocalLink(l.anchorDir, docPath, string(destination))
-
-		// Local link. Check if exists.
-		if err := l.localLinksByFile.Lookup(newDest); err != nil {
-			l.errs.Add(errors.Wrapf(err, "link %v, normalized to %v", string(destination), newDest))
-		}
-		return destination, nil
-	}
-
-	// TODO(bwplotka): Respect context.
-	if err := l.c.Visit(string(destination)); err != nil && err != colly.ErrAlreadyVisited {
-		l.errs.Add(errors.Wrapf(err, "remote link %v", string(destination)))
-	}
+func (v *validator) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
+	v.visit(ctx.Filepath, string(destination))
 	return destination, nil
 }
 
-func (l *validator) Close() error {
-	l.c.Wait()
+func (v *validator) Close(ctx mdformatter.SourceContext) error {
+	v.c.Wait()
 
-	if err := l.errs.Err(); err != nil {
-		for _, e := range err.Errors() {
-			level.Warn(l.logger).Log("msg", e.Error())
+	var keys []futureKey
+	for k := range v.destFutures {
+		if k.filepath != ctx.Filepath {
+			continue
 		}
-		return errors.Errorf("found %v problems with links.", len(err.Errors()))
+		keys = append(keys, k)
 	}
-	return nil
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].filepath+keys[i].dest > keys[j].filepath+keys[j].dest
+	})
+
+	merr := merrors.New()
+	for _, k := range keys {
+		f := v.destFutures[k]
+		if err := f.resultFn(); err != nil {
+			if f.cases == 1 {
+				merr.Add(err)
+				continue
+			}
+			merr.Add(errors.Wrapf(err, "(%v occurences)", f.cases))
+		}
+	}
+	return merr.Err()
+}
+
+func (v *validator) visit(filepath string, dest string) {
+	v.future.Lock()
+	defer v.future.Unlock()
+	k := futureKey{filepath: filepath, dest: dest}
+	if _, ok := v.destFutures[k]; ok {
+		v.destFutures[k].cases++
+		return
+	}
+	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
+	if v.except.MatchString(dest) {
+		return
+	}
+
+	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
+	if matches == nil {
+		// Relative or absolute path. Check if exists.
+		newDest := absLocalLink(v.anchorDir, filepath, dest)
+
+		// Local link. Check if exists.
+		if err := v.localLinks.Lookup(newDest); err != nil {
+			v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
+		}
+		return
+	}
+
+	// Result will be in future.
+	v.destFutures[k].resultFn = func() error { return v.remoteLinks[dest] }
+	if _, ok := v.remoteLinks[dest]; ok {
+		return
+	}
+
+	if err := v.c.Visit(dest); err != nil {
+		v.remoteLinks[dest] = errors.Wrapf(err, "remote link %v", dest)
+	}
 }
 
 type localLinksCache map[string]*[]string
-
-type LookupError error
-
-var (
-	FileNotFoundErr = LookupError(errors.New("file not found"))
-	IDNotFoundErr   = LookupError(errors.New("file exists, but does not have such id"))
-)
-
-func absLocalLink(anchorDir string, docPath string, destination string) string {
-	newDest := destination
-	switch {
-	case filepath.IsAbs(destination):
-		return filepath.Join(anchorDir, destination[1:])
-	case destination == ".":
-		newDest = filepath.Base(docPath)
-	case strings.HasPrefix(destination, "#"):
-		newDest = filepath.Base(docPath) + destination
-	}
-	return filepath.Join(filepath.Dir(docPath), newDest)
-}
-
-func absLinkToRelLink(absLink string, docPath string) ([]byte, error) {
-	absLinkSplit := strings.Split(absLink, "#")
-	rel, err := filepath.Rel(filepath.Dir(docPath), absLinkSplit[0])
-	if err != nil {
-		return nil, err
-	}
-
-	if rel == filepath.Base(docPath) {
-		rel = "."
-	}
-
-	if len(absLinkSplit) == 1 {
-		return []byte(rel), nil
-	}
-
-	if rel != "." {
-		return append([]byte(rel), append([]byte{'#'}, absLinkSplit[1]...)...), nil
-	}
-	return append([]byte{'#'}, absLinkSplit[1]...), nil
-}
 
 // Lookup looks for given link in local anchorDir. It returns error if link can't be found.
 func (l localLinksCache) Lookup(absLink string) error {
@@ -278,20 +298,36 @@ func toHeaderID(header []byte) string {
 	return string(id)
 }
 
-// GetAnchorDir returns validated anchor dir against files provided.
-func GetAnchorDir(anchorDir string, files []string) (_ string, err error) {
-	if anchorDir == "" {
-		anchorDir, err = os.Getwd()
-		if err != nil {
-			return "", err
-		}
+func absLocalLink(anchorDir string, docPath string, destination string) string {
+	newDest := destination
+	switch {
+	case filepath.IsAbs(destination):
+		return filepath.Join(anchorDir, destination[1:])
+	case destination == ".":
+		newDest = filepath.Base(docPath)
+	case strings.HasPrefix(destination, "#"):
+		newDest = filepath.Base(docPath) + destination
+	}
+	return filepath.Join(filepath.Dir(docPath), newDest)
+}
+
+func absLinkToRelLink(absLink string, docPath string) ([]byte, error) {
+	absLinkSplit := strings.Split(absLink, "#")
+	rel, err := filepath.Rel(filepath.Dir(docPath), absLinkSplit[0])
+	if err != nil {
+		return nil, err
 	}
 
-	// Check if provided files are within anchorDir way.
-	for _, f := range files {
-		if !strings.HasPrefix(f, anchorDir) {
-			return "", errors.Errorf("anchorDir %q is not in path of provided file %q", anchorDir, f)
-		}
+	if rel == filepath.Base(docPath) {
+		rel = "."
 	}
-	return anchorDir, nil
+
+	if len(absLinkSplit) == 1 {
+		return []byte(rel), nil
+	}
+
+	if rel != "." {
+		return append([]byte(rel), append([]byte{'#'}, absLinkSplit[1]...)...), nil
+	}
+	return append([]byte{'#'}, absLinkSplit[1]...), nil
 }

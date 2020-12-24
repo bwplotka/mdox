@@ -10,9 +10,16 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
+## [v0.2.0](https://github.com/bwplotka/mdox/releases/tag/v0.2.0)
+
 ### Changed
 
+* Changed `--links.localise.address-regex` flag to `--links.localize.address-regex`
+* Changed `--links.anchor-dir` flag to `--anchor-dir`.
 * Changed `--links.validate.address-regex` flag to `--links.validate.without-address-regex`.
+* Allow anchor dir to be relative.
+* Improved error formatting.
+* By default front matter is getting formatted now.
 
 ## [v0.1.0](https://github.com/bwplotka/mdox/releases/tag/v0.1.0)
 

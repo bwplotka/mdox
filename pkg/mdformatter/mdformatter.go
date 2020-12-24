@@ -6,9 +6,11 @@ package mdformatter
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"sort"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
@@ -22,19 +24,25 @@ import (
 	"github.com/yuin/goldmark/parser"
 )
 
+type SourceContext struct {
+	context.Context
+
+	Filepath string
+}
+
 type FrontMatterTransformer interface {
-	TransformFrontMatter(ctx context.Context, docPath string, frontMatter map[string]interface{}) ([]byte, error)
-	io.Closer
+	TransformFrontMatter(ctx SourceContext, frontMatter map[string]interface{}) ([]byte, error)
+	Close(ctx SourceContext) error
 }
 
 type LinkTransformer interface {
-	TransformDestination(ctx context.Context, docPath string, destination []byte) ([]byte, error)
-	io.Closer
+	TransformDestination(ctx SourceContext, destination []byte) ([]byte, error)
+	Close(ctx SourceContext) error
 }
 
 type CodeBlockTransformer interface {
-	TransformCodeBlock(ctx context.Context, docPath string, infoString []byte, code []byte) ([]byte, error)
-	io.Closer
+	TransformCodeBlock(ctx SourceContext, infoString []byte, code []byte) ([]byte, error)
+	Close(ctx SourceContext) error
 }
 
 type Formatter struct {
@@ -72,7 +80,7 @@ func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 func New(ctx context.Context, opts ...Option) *Formatter {
 	f := &Formatter{
 		ctx: ctx,
-		fm:  RemoveFrontMatter{},
+		fm:  FormatFrontMatter{},
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -82,14 +90,34 @@ func New(ctx context.Context, opts ...Option) *Formatter {
 
 type RemoveFrontMatter struct{}
 
-func (RemoveFrontMatter) TransformFrontMatter(_ context.Context, _ string, frontMatter map[string]interface{}) ([]byte, error) {
-	for k := range frontMatter {
-		delete(frontMatter, k)
-	}
+func (RemoveFrontMatter) TransformFrontMatter(_ SourceContext, _ map[string]interface{}) ([]byte, error) {
 	return nil, nil
 }
 
 func (RemoveFrontMatter) Close() error { return nil }
+
+type FormatFrontMatter struct{}
+
+func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
+	if len(frontMatter) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]string, 0, len(frontMatter))
+	for k := range frontMatter {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+
+	b := bytes.NewBuffer([]byte("---\n"))
+	for _, k := range keys {
+		_, _ = fmt.Fprintf(b, "%v: %v\n", k, frontMatter[k])
+	}
+	_, _ = b.Write([]byte("---\n\n"))
+	return b.Bytes(), nil
+}
+
+func (FormatFrontMatter) Close(SourceContext) error { return nil }
 
 // Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
 func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
@@ -177,34 +205,10 @@ func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ..
 
 // Format writes formatted input file into out writer.
 func (f *Formatter) Format(file *os.File, out io.Writer) error {
-	t := &transformer{
-		wrapped: markdown.NewRenderer(),
-		f:       f,
-		docPath: file.Name(),
+	sourceCtx := SourceContext{
+		Context:  f.ctx,
+		Filepath: file.Name(),
 	}
-	gm1 := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM,
-		),
-		goldmark.WithParserOptions(
-			parser.WithAttribute(), // Enable # headers {#custom-ids}.
-			parser.WithHeadingAttribute(),
-		),
-		goldmark.WithParserOptions(),
-		goldmark.WithRenderer(nopOpsRenderer{Renderer: t}),
-	)
-
-	gm2 := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM,
-		),
-		goldmark.WithParserOptions(
-			parser.WithAttribute(), // Enable # headers {#custom-ids}.
-			parser.WithHeadingAttribute(),
-		),
-		goldmark.WithParserOptions(),
-		goldmark.WithRenderer(markdown.NewRenderer()),
-	)
 
 	b, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -219,14 +223,15 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	}
 
 	if f.fm != nil {
-		hdr, err := f.fm.TransformFrontMatter(f.ctx, file.Name(), frontMatter)
+		// TODO(bwplotka): Handle some front matter, wrongly put not as header.
+		hdr, err := f.fm.TransformFrontMatter(sourceCtx, frontMatter)
 		if err != nil {
 			return err
 		}
 		if _, err := out.Write(hdr); err != nil {
 			return err
 		}
-		if err := f.fm.Close(); err != nil {
+		if err := f.fm.Close(sourceCtx); err != nil {
 			return err
 		}
 	}
@@ -234,13 +239,28 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	// Hack: run Convert two times to ensure deterministic whitespace alignment.
 	// This also immediately show transformers which are not working well together etc.
 	tmp := bytes.Buffer{}
-	if err := gm1.Convert(content, &tmp); err != nil {
+	tr := &transformer{
+		wrapped:   markdown.NewRenderer(),
+		sourceCtx: sourceCtx,
+		link:      f.link, cb: f.cb,
+	}
+	if err := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
+		goldmark.WithParserOptions(),
+		goldmark.WithRenderer(nopOpsRenderer{Renderer: tr}),
+	).Convert(content, &tmp); err != nil {
 		return errors.Wrapf(err, "first formatting phase for %v", file.Name())
 	}
-	if err := t.Close(); err != nil {
-		return err
+	if err := tr.Close(sourceCtx); err != nil {
+		return errors.Wrapf(err, "%v", file.Name())
 	}
-	if err := gm2.Convert(tmp.Bytes(), out); err != nil {
+	if err := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
+		goldmark.WithParserOptions(),
+		goldmark.WithRenderer(markdown.NewRenderer()), // No transforming for second phase.
+	).Convert(tmp.Bytes(), out); err != nil {
 		return errors.Wrapf(err, "second formatting phase for %v", file.Name())
 	}
 	return nil

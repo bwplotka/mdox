@@ -26,12 +26,14 @@ type transformer struct {
 
 	wrapped renderer.Renderer
 
-	f       *Formatter
-	docPath string
+	sourceCtx SourceContext
+
+	link LinkTransformer
+	cb   CodeBlockTransformer
 }
 
 func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
-	if t.f.link == nil && t.f.cb == nil {
+	if t.link == nil && t.cb == nil {
 		return t.wrapped.Render(w, source, node)
 	}
 
@@ -39,18 +41,18 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 		var err error
 		switch typedNode := n.(type) {
 		case *ast.Link:
-			if !entering || t.f.link == nil {
+			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			typedNode.Destination, err = t.f.link.TransformDestination(t.f.ctx, t.docPath, typedNode.Destination)
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
 			if err != nil {
 				return ast.WalkStop, err
 			}
 		case *ast.AutoLink:
-			if !entering || t.f.link == nil || typedNode.AutoLinkType != ast.AutoLinkURL {
+			if !entering || t.link == nil || typedNode.AutoLinkType != ast.AutoLinkURL {
 				return ast.WalkSkipChildren, nil
 			}
-			dest, err := t.f.link.TransformDestination(t.f.ctx, t.docPath, typedNode.URL(source))
+			dest, err := t.link.TransformDestination(t.sourceCtx, typedNode.URL(source))
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -61,10 +63,10 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			repl.SetParent(n)
 			n.Parent().ReplaceChild(n.Parent(), n, repl)
 		case *ast.FencedCodeBlock:
-			if !entering || t.f.cb == nil || typedNode.Info == nil {
+			if !entering || t.cb == nil || typedNode.Info == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			blockContent, err := t.f.cb.TransformCodeBlock(t.f.ctx, t.docPath, typedNode.Info.Text(source), typedNode.Text(source))
+			blockContent, err := t.cb.TransformCodeBlock(t.sourceCtx, typedNode.Info.Text(source), typedNode.Text(source))
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -82,13 +84,13 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 	return t.wrapped.Render(w, source, node)
 }
 
-func (t *transformer) Close() error {
+func (t *transformer) Close(ctx SourceContext) error {
 	errs := merrors.New()
-	if t.f.link != nil {
-		errs.Add(t.f.link.Close())
+	if t.link != nil {
+		errs.Add(t.link.Close(ctx))
 	}
-	if t.f.cb != nil {
-		errs.Add(t.f.cb.Close())
+	if t.cb != nil {
+		errs.Add(t.cb.Close(ctx))
 	}
 	return errs.Err()
 }

@@ -16,6 +16,8 @@ On top of this feel free to go through our tutorial presented here:
 Yolo link https://thanos.io/some
 Yolo email something@gmail.com
 
+* [ ] task
+  * [x] task
 ### Prometheus
 
 Thanos is based on Prometheus. With Thanos you use more or less Prometheus features depending on the deployment model, however

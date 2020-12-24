@@ -87,8 +87,8 @@ github.com/bep/gitmap v1.1.2/go.mod h1:g9VRETxFUXNWzMiuxOwcudo6DfZkW9jOsOW0Ft4kY
 github.com/bep/golibsass v0.6.0/go.mod h1:DL87K8Un/+pWUS75ggYv41bliGiolxzDKWJAq3eJ1MA=
 github.com/bep/tmc v0.5.1/go.mod h1:tGYHN8fS85aJPhDLgXETVKp+PR382OvFi2+q2GkGsq0=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
-github.com/bwplotka/markdownfmt/v2 v2.0.0-20201223130030-c496cb0bcc88 h1:v5CH+iRtJ8rKDp5/tIqrQKMjS5hutLVnJGWc6Im83Xw=
-github.com/bwplotka/markdownfmt/v2 v2.0.0-20201223130030-c496cb0bcc88/go.mod h1:niFn22lPHG2owQ+pHRB0bz3tkrCuVjvlUy4iFdRY+Bo=
+github.com/bwplotka/markdownfmt/v2 v2.0.0-20201225192631-f2e7830d9793 h1:rOgyoOeqYbd3ox7MuhAOKOtdCDWWWkpZ2gglPLda62s=
+github.com/bwplotka/markdownfmt/v2 v2.0.0-20201225192631-f2e7830d9793/go.mod h1:niFn22lPHG2owQ+pHRB0bz3tkrCuVjvlUy4iFdRY+Bo=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/census-instrumentation/opencensus-proto v0.2.0/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

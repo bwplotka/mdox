@@ -7,6 +7,7 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
+	"io"
 )
 
 // NilOrMultiError type allows combining multiple errors into one.
@@ -36,16 +37,16 @@ func (e *NilOrMultiError) Add(errs ...error) {
 	}
 }
 
-// Err returns the error list as an Result (also implements error) or nil if it is empty.
-func (e NilOrMultiError) Err() Result {
+// Err returns the error list as an Error (also implements error) or nil if it is empty.
+func (e NilOrMultiError) Err() Error {
 	if len(e.errs) == 0 {
 		return nil
 	}
 	return multiError(e)
 }
 
-// Result is extended error interface that allows to use returned read-only multi error in more advanced ways.
-type Result interface {
+// Error is extended error interface that allows to use returned read-only multi error in more advanced ways.
+type Error interface {
 	error
 
 	// Errors returns underlying errors.
@@ -70,7 +71,7 @@ type Result interface {
 	Count(target error) int
 }
 
-// multiError implements the error and Result interfaces, and it represents NilOrMultiError (in other words []error) with at least one error inside it.
+// multiError implements the error and Error interfaces, and it represents NilOrMultiError (in other words []error) with at least one error inside it.
 // NOTE: This type is useful to make sure that NilOrMultiError is not accidentally used for err != nil check.
 type multiError struct {
 	errs []error
@@ -88,7 +89,6 @@ func (e multiError) Error() string {
 	if len(e.errs) > 1 {
 		fmt.Fprintf(&buf, "%d errors: ", len(e.errs))
 	}
-
 	for i, err := range e.errs {
 		if i != 0 {
 			buf.WriteString("; ")
@@ -161,12 +161,55 @@ func (e multiError) Count(target error) (count int) {
 	return count
 }
 
-// As casts error to multi error read only interface. It returns multi error and true if error matches multi error as
+// AsMulti casts error to multi error read only interface. It returns multi error and true if error matches multi error as
 // defined by As method. If returns false if no multi error can be found.
-func AsMulti(err error) (Result, bool) {
+func AsMulti(err error) (Error, bool) {
 	m := multiError{}
 	if !stderrors.As(err, &m) {
 		return nil, false
 	}
 	return m, true
+}
+
+// Merge merges multiple Error to single one, but joining all errors together.
+// NOTE: Nested multi errors are not merged.
+func Merge(errs []Error) Error {
+	e := multiError{}
+	for _, err := range errs {
+		e.errs = append(e.errs, err.Errors()...)
+	}
+	return e
+}
+
+// PrettyPrint prints the same information as multiError.Error() method but with newlines and indentation targeted
+// for humans.
+func PrettyPrint(w io.Writer, err Error) error {
+	return prettyPrint(w, "\t", err)
+}
+
+func prettyPrint(w io.Writer, indent string, merr Error) error {
+	if len(merr.Errors()) > 1 {
+		if _, err := fmt.Fprintf(w, "%d errors:\n", len(merr.Errors())); err != nil {
+			return err
+		}
+	}
+	for i, err := range merr.Errors() {
+		if i != 0 {
+			if _, err := w.Write([]byte("\n")); err != nil {
+				return err
+			}
+		}
+
+		if merr2, ok := AsMulti(err); ok {
+			if err := prettyPrint(w, indent+"\t", merr2); err != nil {
+				return nil
+			}
+			continue
+		}
+
+		if _, err := w.Write([]byte(indent + err.Error())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
