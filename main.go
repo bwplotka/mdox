@@ -117,7 +117,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		"Absolute path links will be converted to relative links to anchor dri as well.").Regexp()
 	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
-	linksValidateExceptDomains := cmd.Flag("links.validate.address-regex", "If specified, all links will be validated, except those matching the given target address.").Default(`^$`).Regexp()
+	linksValidateExceptDomains := cmd.Flag("links.validate.without-address-regex", "If specified, all links will be validated, except those matching the given target address.").Default(`^$`).Regexp()
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var opts []mdformatter.Option

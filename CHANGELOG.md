@@ -10,6 +10,10 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
+### Changed
+
+* Changed `--links.validate.address-regex` flag to `--links.validate.without-address-regex`.
+
 ## [v0.1.0](https://github.com/bwplotka/mdox/releases/tag/v0.1.0)
 
 Initial release.

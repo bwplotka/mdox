@@ -55,7 +55,7 @@ Flags:
                                  exists).Absolute path links will be converted
                                  to relative links to anchor dri as well.
   -l, --links.validate           If true, all links will be validated
-      --links.validate.address-regex=^$  
+      --links.validate.without-address-regex=^$  
                                  If specified, all links will be validated,
                                  except those matching the given target address.
 
