@@ -151,8 +151,11 @@ This directive runs executable with arguments and put its stderr and stdout outp
 
 		var linkTr []mdformatter.LinkTransformer
 		if *linksValidateEnabled {
-			// Put link validation before localization so we
-			linkTr = append(linkTr, linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir))
+			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir)
+			if err != nil {
+				return err
+			}
+			linkTr = append(linkTr, v)
 		}
 		if *linksLocalizeForAddress != nil {
 			linkTr = append(linkTr, linktransformer.NewLocalizer(logger, *linksLocalizeForAddress, anchorDir))

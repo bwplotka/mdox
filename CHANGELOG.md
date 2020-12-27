@@ -10,10 +10,12 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
-## [v0.2.0](https://github.com/bwplotka/mdox/releases/tag/v0.2.0)
+## [v0.2.0](https://github.com/bwplotka/mdox/releases/tag/v0.1.0)
 
 ### Changed
 
+* Fixed whitespace bug in code blocks.
+* Add support for links.
 * Changed `--links.localise.address-regex` flag to `--links.localize.address-regex`
 * Changed `--links.anchor-dir` flag to `--anchor-dir`.
 * Changed `--links.validate.address-regex` flag to `--links.validate.without-address-regex`.

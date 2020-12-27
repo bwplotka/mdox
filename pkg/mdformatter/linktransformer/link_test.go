@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/bwplotka/mdox/pkg/testutil"
+	"github.com/efficientgo/tools/pkg/testutil"
 	"github.com/go-kit/kit/log"
 )
 
@@ -140,7 +140,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -158,7 +158,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -176,7 +176,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
 		testutil.Equals(t, fmt.Sprintf("%v/repo/docs/test/invalid-local-links.md: 4 errors: "+
@@ -196,7 +196,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			NewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
 		testutil.Equals(t, tmpDir+"/repo/docs/test/invalid-link.md: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", err.Error())
@@ -211,7 +211,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			NewValidator(logger, regexp.MustCompile(`://bwplotka.dev`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`://bwplotka.dev`), anchorDir),
 		))
 		testutil.Ok(t, err)
 	})

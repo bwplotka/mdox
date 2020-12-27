@@ -425,3 +425,16 @@ alertmanagers:
   timeout: 10s
   api_version: v1
 ```
+
+```Makefile
+include .bingo/Variables.mk
+run:
+	$(<PROVIDED_TOOL_NAME>) <args>
+```
+
+```Makefile
+include .bingo/Variables.mk
+
+run:
+	$(<PROVIDED_TOOL_NAME>) <args>
+```

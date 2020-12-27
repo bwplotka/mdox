@@ -15,7 +15,7 @@ import (
 	"sync"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/bwplotka/mdox/pkg/merrors"
+	"github.com/efficientgo/tools/pkg/merrors"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gocolly/colly/v2"
@@ -111,10 +111,11 @@ type validator struct {
 	except    *regexp.Regexp
 
 	localLinks  localLinksCache
+	rMu         sync.RWMutex
 	remoteLinks map[string]error
 	c           *colly.Collector
 
-	future      sync.Mutex
+	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
 }
 
@@ -129,7 +130,8 @@ type futureResult struct {
 }
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
-func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) mdformatter.LinkTransformer {
+// TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
+func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (mdformatter.LinkTransformer, error) {
 	v := &validator{
 		logger:      logger,
 		anchorDir:   anchorDir,
@@ -139,12 +141,34 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) md
 		c:           colly.NewCollector(colly.Async()),
 		destFutures: map[futureKey]*futureResult{},
 	}
+	// Set very soft limits.
+	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
+	// on api (only search is below 100).
+	if err := v.c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Parallelism: 100,
+	}); err != nil {
+		return nil, err
+	}
 	v.c.OnScraped(func(response *colly.Response) {
+		v.rMu.Lock()
+		defer v.rMu.Unlock()
 		v.remoteLinks[response.Request.URL.String()] = nil
 	})
 	v.c.OnError(func(response *colly.Response, err error) {
+		v.rMu.Lock()
+		defer v.rMu.Unlock()
 		v.remoteLinks[response.Request.URL.String()] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 	})
+	return v, nil
+}
+
+// MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
+func MustNewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) mdformatter.LinkTransformer {
+	v, err := NewValidator(logger, except, anchorDir)
+	if err != nil {
+		panic(err)
+	}
 	return v
 }
 
@@ -175,15 +199,15 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 				merr.Add(err)
 				continue
 			}
-			merr.Add(errors.Wrapf(err, "(%v occurences)", f.cases))
+			merr.Add(errors.Wrapf(err, "(%v occurrences)", f.cases))
 		}
 	}
 	return merr.Err()
 }
 
 func (v *validator) visit(filepath string, dest string) {
-	v.future.Lock()
-	defer v.future.Unlock()
+	v.futureMu.Lock()
+	defer v.futureMu.Unlock()
 	k := futureKey{filepath: filepath, dest: dest}
 	if _, ok := v.destFutures[k]; ok {
 		v.destFutures[k].cases++
@@ -208,6 +232,16 @@ func (v *validator) visit(filepath string, dest string) {
 
 	// Result will be in future.
 	v.destFutures[k].resultFn = func() error { return v.remoteLinks[dest] }
+	v.rMu.RLock()
+	if _, ok := v.remoteLinks[dest]; ok {
+		v.rMu.RUnlock()
+		return
+	}
+	v.rMu.RUnlock()
+
+	v.rMu.Lock()
+	defer v.rMu.Unlock()
+	// We need to check again here to avoid race.
 	if _, ok := v.remoteLinks[dest]; ok {
 		return
 	}
@@ -245,16 +279,28 @@ func (l localLinksCache) Lookup(absLink string) error {
 	return errors.Wrapf(IDNotFoundErr, "link %v, existing ids: %v", absLink, *ids)
 }
 
-func (l localLinksCache) addRelLinks(localFile string) error {
+func (l localLinksCache) addRelLinks(localLink string) error {
 	// Add item for negative caching.
-	l[localFile] = nil
+	l[localLink] = nil
 
-	file, err := os.Open(localFile)
+	st, err := os.Stat(localLink)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrapf(err, "failed to open file %v", localFile)
+		return errors.Wrapf(err, "failed to stat %v", localLink)
+	}
+
+	if st.IsDir() {
+		// Dir present, cache presence.
+		ids := make([]string, 0)
+		l[localLink] = &ids
+		return nil
+	}
+
+	file, err := os.Open(localLink)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open file %v", localLink)
 	}
 	defer file.Close()
 
@@ -267,7 +313,7 @@ func (l localLinksCache) addRelLinks(localFile string) error {
 		b, err = reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return errors.Wrapf(err, "failed to read file %v", localFile)
+				return errors.Wrapf(err, "failed to read file %v", localLink)
 			}
 			break
 		}
@@ -276,7 +322,8 @@ func (l localLinksCache) addRelLinks(localFile string) error {
 			ids = append(ids, toHeaderID(b))
 		}
 	}
-	l[localFile] = &ids
+
+	l[localLink] = &ids
 	return nil
 }
 

@@ -1,3 +1,6 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 // Package clilog is a github.com/go-kit/kit/log logger implementation suitable for CLI tools.
 // Main goal is to log in human readable ways e.g:
 //
@@ -18,7 +21,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/bwplotka/mdox/pkg/merrors"
+	"github.com/efficientgo/tools/pkg/merrors"
 	"github.com/go-kit/kit/log"
 )
 
@@ -300,7 +303,7 @@ func safeMarshal(tm encoding.TextMarshaler) (b []byte, err error) {
 			if v := reflect.ValueOf(tm); v.Kind() == reflect.Ptr && v.IsNil() {
 				b, err = nil, nil
 			} else {
-				b, err = nil, fmt.Errorf("panic when marshalling: %s", panicVal)
+				b, err = nil, fmt.Errorf("panic when marshaling: %s", panicVal)
 			}
 		}
 	}()

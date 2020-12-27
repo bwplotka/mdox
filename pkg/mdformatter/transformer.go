@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/bwplotka/mdox/pkg/merrors"
+	"github.com/efficientgo/tools/pkg/merrors"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"

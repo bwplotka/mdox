@@ -32,8 +32,7 @@ Flags:
                                  --help-long and --help-man).
       --version                  Show application version.
       --log.level=info           Log filtering level.
-      --log.format=logfmt        Log format to use. Possible options: logfmt or
-                                 json.
+      --log.format=clilog        Log format to use.
       --check                    If true, fmt will not modify the given files,
                                  instead it will fail if files needs formatting
       --code.disable-directives  If false, fmt will parse custom fenced code
@@ -45,15 +44,14 @@ Flags:
                                  This directive runs executable with arguments
                                  and put its stderr and stdout output inside
                                  code block content, replacing existing one.
-      --links.anchor-dir=LINKS.ANCHOR-DIR  
-                                 Anchor directory for link transformers. PWD
-                                 flag is not specified.
-      --links.localise.address-regex=LINKS.LOCALISE.ADDRESS-REGEX  
+      --anchor-dir=ANCHOR-DIR    Anchor directory for all transformers. PWD is
+                                 used if flag is not specified.
+      --links.localize.address-regex=LINKS.LOCALIZE.ADDRESS-REGEX  
                                  If specified, all HTTP(s) links that target a
                                  domain and path matching given regexp will be
                                  transformed to relative to anchor dir path (if
                                  exists).Absolute path links will be converted
-                                 to relative links to anchor dri as well.
+                                 to relative links to anchor dir as well.
   -l, --links.validate           If true, all links will be validated
       --links.validate.without-address-regex=^$  
                                  If specified, all links will be validated,

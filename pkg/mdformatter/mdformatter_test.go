@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bwplotka/mdox/pkg/testutil"
+	"github.com/efficientgo/tools/pkg/testutil"
 	"github.com/go-kit/kit/log"
 )
 

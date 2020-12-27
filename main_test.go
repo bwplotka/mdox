@@ -1,10 +1,13 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 package main
 
 import (
 	"os"
 	"testing"
 
-	"github.com/bwplotka/mdox/pkg/testutil"
+	"github.com/efficientgo/tools/pkg/testutil"
 )
 
 func TestValidateAnchorDir(t *testing.T) {
