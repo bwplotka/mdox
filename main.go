@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
@@ -18,6 +19,8 @@ import (
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/version"
+	"github.com/efficientgo/tools/pkg/errcapture"
+	"github.com/efficientgo/tools/pkg/profiles"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -27,7 +30,7 @@ import (
 
 const (
 	logFormatLogfmt = "logfmt"
-	logFormatJson   = "json"
+	logFormatJSON   = "json"
 	logFormatCLILog = "clilog"
 )
 
@@ -46,7 +49,7 @@ func setupLogger(logLevel, logFormat string) log.Logger {
 		panic("unexpected log level")
 	}
 	switch logFormat {
-	case logFormatJson:
+	case logFormatJSON:
 		return level.NewFilter(log.NewJSONLogger(log.NewSyncWriter(os.Stderr)), lvl)
 	case logFormatLogfmt:
 		return level.NewFilter(log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), lvl)
@@ -62,7 +65,7 @@ func main() {
 	logLevel := app.Flag("log.level", "Log filtering level.").
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use.").
-		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
+		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJSON, logFormatCLILog)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app)
@@ -70,6 +73,17 @@ func main() {
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
+
+	profileDir := filepath.Join("/home/bwplotka/Repos/_dev/efficientgo/profiles", fmt.Sprintf("%v", time.Now().Unix()))
+	//close1, err := profiles.StartCPU(profileDir, profiles.CPUTypeBuiltIn)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	closeFn, err := profiles.StartCPU(profileDir, profiles.CPUTypeBuiltIn)
+	if err != nil {
+		panic(err)
+	}
 
 	var g run.Group
 	g.Add(func() error {
@@ -90,6 +104,7 @@ func main() {
 	}
 
 	if err := g.Run(); err != nil {
+		errcapture.CloseWithLog(logger, closeFn, "close1")
 		if *logLevel == "debug" {
 			// Use %+v for github.com/pkg/errors error to print with stack.
 			level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
@@ -98,6 +113,7 @@ func main() {
 		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
 		os.Exit(1)
 	}
+	errcapture.CloseWithLog(logger, closeFn, "close1")
 }
 
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {

@@ -165,7 +165,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			if err != nil {
 				return errors.Wrapf(err, "open %v", fn)
 			}
-			defer errcapture.CloseWithLog(logger, file, "close file %v", fn)
+			defer errcapture.CloseWithLog(logger, file.Close, "close file %v", fn)
 
 			b.Reset()
 			if err := f.Format(file, &b); err != nil {
@@ -239,6 +239,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		sourceCtx: sourceCtx,
 		link:      f.link, cb: f.cb,
 	}
+
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
