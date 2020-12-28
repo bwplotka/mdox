@@ -83,12 +83,13 @@ Requirements to build this tool:
 * Linux or MacOS
 
 ```shell
-go get github.com/bwplotka/mdox && go mod tidy
+go install github.com/bwplotka/mdox
 ```
 
 or via [bingo](https://github.com/bwplotka/bingo) if want to pin it:
 
 ```shell
+go install github.com/bwplotka/bingo
 bingo get -u github.com/bwplotka/mdox
 ```
 

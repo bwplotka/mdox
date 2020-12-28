@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/Kunde21/markdownfmt/v2 v2.0.4-0.20201214081534-353201c4cdce
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
-	github.com/efficientgo/tools v0.0.0-20201227131601-4dde9fba2562
+	github.com/efficientgo/tools/core v0.0.0-20201227131601-4dde9fba2562
 	github.com/go-kit/kit v0.10.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/gohugoio/hugo v0.74.3
@@ -21,5 +21,5 @@ require (
 
 replace (
 	github.com/Kunde21/markdownfmt/v2 => github.com/bwplotka/markdownfmt/v2 v2.0.0-20201225192631-f2e7830d9793
-	github.com/efficientgo/tools => ../tools
+	github.com/efficientgo/tools/core => ../tools/core
 )

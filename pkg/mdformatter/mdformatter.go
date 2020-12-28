@@ -14,8 +14,8 @@ import (
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
-	"github.com/efficientgo/tools/pkg/errcapture"
-	"github.com/efficientgo/tools/pkg/merrors"
+	"github.com/efficientgo/tools/core/pkg/logerrcapture"
+	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/pkg/errors"
@@ -165,7 +165,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			if err != nil {
 				return errors.Wrapf(err, "open %v", fn)
 			}
-			defer errcapture.CloseWithLog(logger, file.Close, "close file %v", fn)
+			defer logerrcapture.Close(logger, file.Close, "close file %v", fn)
 
 			b.Reset()
 			if err := f.Format(file, &b); err != nil {

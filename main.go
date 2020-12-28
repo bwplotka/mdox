@@ -11,16 +11,13 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
-	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/version"
-	"github.com/efficientgo/tools/pkg/errcapture"
-	"github.com/efficientgo/tools/pkg/profiles"
+	"github.com/efficientgo/tools/core/pkg/clilog"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -74,17 +71,6 @@ func main() {
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
 
-	profileDir := filepath.Join("/home/bwplotka/Repos/_dev/efficientgo/profiles", fmt.Sprintf("%v", time.Now().Unix()))
-	//close1, err := profiles.StartCPU(profileDir, profiles.CPUTypeBuiltIn)
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	closeFn, err := profiles.StartCPU(profileDir, profiles.CPUTypeBuiltIn)
-	if err != nil {
-		panic(err)
-	}
-
 	var g run.Group
 	g.Add(func() error {
 		// TODO(bwplotka): Move to customized better setup function.
@@ -104,7 +90,6 @@ func main() {
 	}
 
 	if err := g.Run(); err != nil {
-		errcapture.CloseWithLog(logger, closeFn, "close1")
 		if *logLevel == "debug" {
 			// Use %+v for github.com/pkg/errors error to print with stack.
 			level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
@@ -113,7 +98,6 @@ func main() {
 		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
 		os.Exit(1)
 	}
-	errcapture.CloseWithLog(logger, closeFn, "close1")
 }
 
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
