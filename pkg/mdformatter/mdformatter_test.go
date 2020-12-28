@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bwplotka/mdox/pkg/testutil"
+	"github.com/efficientgo/tools/pkg/testutil"
 	"github.com/go-kit/kit/log"
 )
 
@@ -59,19 +59,19 @@ type mockLinkTransformer struct {
 	closed bool
 }
 
-func (*mockLinkTransformer) TransformDestination(_ context.Context, docPath string, destination []byte) ([]byte, error) {
+func (*mockLinkTransformer) TransformDestination(ctx SourceContext, destination []byte) ([]byte, error) {
 	if bytes.HasPrefix(destination, []byte("$$-")) {
 		return destination, nil
 	}
 	b := bytes.NewBufferString("$$-")
 	_, _ = b.Write(destination)
 	_, _ = b.WriteString("-")
-	_, _ = b.WriteString(docPath)
+	_, _ = b.WriteString(ctx.Filepath)
 	_, _ = b.WriteString("-$$")
 	return b.Bytes(), nil
 }
 
-func (m *mockLinkTransformer) Close() error {
+func (m *mockLinkTransformer) Close(SourceContext) error {
 	m.closed = true
 	return nil
 }

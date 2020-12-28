@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/mattn/go-shellwords"
 
 	"github.com/pkg/errors"
@@ -26,7 +27,7 @@ func NewCodeBlockTransformer() *genCodeBlockTransformer {
 	return &genCodeBlockTransformer{}
 }
 
-func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, _ string, infoString []byte, code []byte) ([]byte, error) {
+func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceContext, infoString []byte, code []byte) ([]byte, error) {
 	if len(infoString) == 0 {
 		return code, nil
 	}
@@ -89,7 +90,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx context.Context, _ stri
 	panic("should never get here")
 }
 
-func (t *genCodeBlockTransformer) Close() error { return nil }
+func (t *genCodeBlockTransformer) Close(ctx mdformatter.SourceContext) error { return nil }
 
 func genGo(ctx context.Context, moduleRoot string, typePath string) ([]byte, error) {
 	// TODO(bwplotka): To be done.

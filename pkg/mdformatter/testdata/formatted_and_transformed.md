@@ -1,3 +1,11 @@
+---
+weight: 1
+type: docs
+title: Quick Tutorial
+slug: /quick-tutorial.md
+menu: thanos
+---
+
 # Quick Tutorial
 
 Feel free to check the free, in-browser interactive tutorial [as Katacoda Thanos Course]($$-https://katacoda.com/bwplotka/courses/thanos-testdata/not_formatted.md-$$) We will be progressively updating our Katacoda Course with more scenarios.
@@ -5,6 +13,9 @@ Feel free to check the free, in-browser interactive tutorial [as Katacoda Thanos
 On top of this feel free to go through our tutorial presented here:
 
 Yolo link $$-https://thanos.io/some-testdata/not_formatted.md-$$ Yolo email something@gmail.com
+
+* [ ] task
+  * [X] task
 
 ### Prometheus
 
@@ -413,4 +424,17 @@ alertmanagers:
   path_prefix: ""
   timeout: 10s
   api_version: v1
+```
+
+```Makefile
+include .bingo/Variables.mk
+run:
+	$(<PROVIDED_TOOL_NAME>) <args>
+```
+
+```Makefile
+include .bingo/Variables.mk
+
+run:
+	$(<PROVIDED_TOOL_NAME>) <args>
 ```
