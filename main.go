@@ -6,6 +6,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,10 +20,14 @@ import (
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/version"
 	"github.com/efficientgo/tools/core/pkg/clilog"
+	"github.com/efficientgo/tools/core/pkg/errcapture"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -150,11 +156,39 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 
 		var linkTr []mdformatter.LinkTransformer
+		var m *httpMetrics
 		if *linksValidateEnabled {
 			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir)
 			if err != nil {
 				return err
 			}
+
+			m = &httpMetrics{
+				reg: prometheus.NewRegistry(),
+			}
+			requests := prometheus.NewCounterVec(
+				prometheus.CounterOpts{Name: "does_not_matter"},
+				[]string{"domain", "code", "method"},
+			)
+			perDomainLatency := prometheus.NewHistogramVec(
+				prometheus.HistogramOpts{Name: "does_not_matter1", Buckets: prometheus.DefBuckets},
+				[]string{"domain", "code", "method"},
+			)
+			m.reg.MustRegister(requests, perDomainLatency)
+			defer errcapture.Close(&err, m.Print, "print")
+
+			v.SetTransportFunc(func(u string) http.RoundTripper {
+				parsed, err := url.Parse(u)
+				if err != nil {
+					panic(err)
+				}
+				return promhttp.InstrumentRoundTripperCounter(
+					requests,
+					promhttp.InstrumentRoundTripperDuration(perDomainLatency.MustCurryWith(prometheus.Labels{
+						"domain": parsed.Host,
+					}), http.DefaultTransport),
+				)
+			})
 			linkTr = append(linkTr, v)
 		}
 		if *linksLocalizeForAddress != nil {
@@ -177,6 +211,26 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 		return mdformatter.Format(ctx, logger, *files, opts...)
 	})
+}
+
+type httpMetrics struct {
+	reg *prometheus.Registry
+}
+
+func (h *httpMetrics) Print() error {
+	mfs, err := h.reg.Gather()
+	if err != nil {
+		return err
+	}
+
+	enc := expfmt.NewEncoder(os.Stdout, expfmt.FmtProtoText)
+
+	for _, mf := range mfs {
+		if err := enc.Encode(mf); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // validateAnchorDir returns validated anchor dir against files provided.
