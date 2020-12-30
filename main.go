@@ -6,28 +6,34 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/version"
+	"github.com/efficientgo/tools/core/pkg/clilog"
+	"github.com/efficientgo/tools/core/pkg/errcapture"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const (
 	logFormatLogfmt = "logfmt"
-	logFormatJson   = "json"
+	logFormatJSON   = "json"
 	logFormatCLILog = "clilog"
 )
 
@@ -46,7 +52,7 @@ func setupLogger(logLevel, logFormat string) log.Logger {
 		panic("unexpected log level")
 	}
 	switch logFormat {
-	case logFormatJson:
+	case logFormatJSON:
 		return level.NewFilter(log.NewJSONLogger(log.NewSyncWriter(os.Stderr)), lvl)
 	case logFormatLogfmt:
 		return level.NewFilter(log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), lvl)
@@ -62,7 +68,7 @@ func main() {
 	logLevel := app.Flag("log.level", "Log filtering level.").
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use.").
-		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
+		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJSON, logFormatCLILog)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app)
@@ -150,11 +156,39 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 
 		var linkTr []mdformatter.LinkTransformer
+		var m *httpMetrics
 		if *linksValidateEnabled {
 			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir)
 			if err != nil {
 				return err
 			}
+
+			m = &httpMetrics{
+				reg: prometheus.NewRegistry(),
+			}
+			requests := prometheus.NewCounterVec(
+				prometheus.CounterOpts{Name: "does_not_matter"},
+				[]string{"domain", "code", "method"},
+			)
+			perDomainLatency := prometheus.NewHistogramVec(
+				prometheus.HistogramOpts{Name: "does_not_matter1", Buckets: prometheus.DefBuckets},
+				[]string{"domain", "code", "method"},
+			)
+			m.reg.MustRegister(requests, perDomainLatency)
+			defer errcapture.Close(&err, m.Print, "print")
+
+			v.SetTransportFunc(func(u string) http.RoundTripper {
+				parsed, err := url.Parse(u)
+				if err != nil {
+					panic(err)
+				}
+				return promhttp.InstrumentRoundTripperCounter(
+					requests,
+					promhttp.InstrumentRoundTripperDuration(perDomainLatency.MustCurryWith(prometheus.Labels{
+						"domain": parsed.Host,
+					}), http.DefaultTransport),
+				)
+			})
 			linkTr = append(linkTr, v)
 		}
 		if *linksLocalizeForAddress != nil {
@@ -177,6 +211,26 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 		return mdformatter.Format(ctx, logger, *files, opts...)
 	})
+}
+
+type httpMetrics struct {
+	reg *prometheus.Registry
+}
+
+func (h *httpMetrics) Print() error {
+	mfs, err := h.reg.Gather()
+	if err != nil {
+		return err
+	}
+
+	enc := expfmt.NewEncoder(os.Stdout, expfmt.FmtProtoText)
+
+	for _, mf := range mfs {
+		if err := enc.Encode(mf); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // validateAnchorDir returns validated anchor dir against files provided.

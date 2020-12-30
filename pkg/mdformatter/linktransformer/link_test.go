@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/pkg/testutil"
+	"github.com/efficientgo/tools/core/pkg/testutil"
 	"github.com/go-kit/kit/log"
 )
 

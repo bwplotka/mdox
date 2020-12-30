@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,11 +16,12 @@ import (
 	"sync"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/pkg/merrors"
+	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gocolly/colly/v2"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var remoteLinkPrefixRe = regexp.MustCompile(`^http[s]?://`)
@@ -117,6 +119,8 @@ type validator struct {
 
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
+
+	transportFn func(url string) http.RoundTripper
 }
 
 type futureKey struct {
@@ -131,7 +135,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (mdformatter.LinkTransformer, error) {
+func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (*validator, error) {
 	v := &validator{
 		logger:      logger,
 		anchorDir:   anchorDir,
@@ -140,6 +144,9 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (m
 		remoteLinks: map[string]error{},
 		c:           colly.NewCollector(colly.Async()),
 		destFutures: map[futureKey]*futureResult{},
+		transportFn: func(url string) http.RoundTripper {
+			return http.DefaultTransport
+		},
 	}
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
@@ -246,9 +253,18 @@ func (v *validator) visit(filepath string, dest string) {
 		return
 	}
 
-	if err := v.c.Visit(dest); err != nil {
+	if err := v.c.WithTransport(v.transportFn(dest)).Visit(dest); err != nil {
 		v.remoteLinks[dest] = errors.Wrapf(err, "remote link %v", dest)
 	}
+}
+
+type Metrics struct {
+	requests *prometheus.CounterVec
+	latency  *prometheus.HistogramVec
+}
+
+func (v *validator) SetTransportFunc(transportFn func(url string) http.RoundTripper) {
+	v.transportFn = transportFn
 }
 
 type localLinksCache map[string]*[]string
