@@ -112,27 +112,25 @@ func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[s
 
 	b := bytes.NewBuffer([]byte("---"))
 	for _, k := range keys {
-		// check if frontMatter[k] is a map
+		// Check if frontMatter[k] is a map.
 		frontMatterStr := fmt.Sprintf("%s", frontMatter[k])
-		isMap := strings.HasPrefix(frontMatterStr, "map[")
-
-		// split string to get all key-value pairs
+		_, isMap := frontMatter[k].(map[string]interface{})
+		// Split string to get all key-value pairs.
 		if isMap {
 			_, _ = fmt.Fprintf(b, "\n%v:", k)
 			pairs := strings.Split(frontMatterStr[4:len(frontMatterStr)-1], " ")
-			pair := make([]string, 2)
-			// ignore spaces in values
+			// Ignore spaces in values.
 			for _, val := range pairs {
 				if strings.Contains(val, ":") {
-					pair = strings.Split(val, ":")
+					pair := strings.Split(val, ":")
 					_, _ = fmt.Fprintf(b, "\n  %v: %v", pair[0], pair[1])
-				} else {
-					_, _ = fmt.Fprintf(b, " %v", val)
+					continue
 				}
+				_, _ = fmt.Fprintf(b, " %v", val)
 			}
-		} else {
-			_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])
+			continue
 		}
+		_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])
 	}
 	_, _ = b.Write([]byte("\n---\n\n"))
 	return b.Bytes(), nil
