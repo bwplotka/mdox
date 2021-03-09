@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
@@ -113,20 +112,12 @@ func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[s
 	b := bytes.NewBuffer([]byte("---"))
 	for _, k := range keys {
 		// Check if frontMatter[k] is a map.
-		frontMatterStr := fmt.Sprintf("%s", frontMatter[k])
-		_, isMap := frontMatter[k].(map[string]interface{})
-		// Split string to get all key-value pairs.
+		frontMatterMap, isMap := frontMatter[k].(map[string]interface{})
 		if isMap {
+			// Loop through all nested keys.
 			_, _ = fmt.Fprintf(b, "\n%v:", k)
-			pairs := strings.Split(frontMatterStr[4:len(frontMatterStr)-1], " ")
-			// Ignore spaces in values.
-			for _, val := range pairs {
-				if strings.Contains(val, ":") {
-					pair := strings.Split(val, ":")
-					_, _ = fmt.Fprintf(b, "\n  %v: %v", pair[0], pair[1])
-					continue
-				}
-				_, _ = fmt.Fprintf(b, " %v", val)
+			for key, val := range frontMatterMap {
+				_, _ = fmt.Fprintf(b, "\n  %v: %v", key, val)
 			}
 			continue
 		}
