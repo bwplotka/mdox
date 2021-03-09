@@ -109,11 +109,21 @@ func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[s
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 
-	b := bytes.NewBuffer([]byte("---\n"))
+	b := bytes.NewBuffer([]byte("---"))
 	for _, k := range keys {
-		_, _ = fmt.Fprintf(b, "%v: %v\n", k, frontMatter[k])
+		// Check if frontMatter[k] is a map.
+		frontMatterMap, isMap := frontMatter[k].(map[string]interface{})
+		if isMap {
+			// Loop through all nested keys.
+			_, _ = fmt.Fprintf(b, "\n%v:", k)
+			for key, val := range frontMatterMap {
+				_, _ = fmt.Fprintf(b, "\n  %v: %v", key, val)
+			}
+			continue
+		}
+		_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])
 	}
-	_, _ = b.Write([]byte("---\n\n"))
+	_, _ = b.Write([]byte("\n---\n\n"))
 	return b.Bytes(), nil
 }
 
