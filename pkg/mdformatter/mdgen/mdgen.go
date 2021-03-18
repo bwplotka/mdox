@@ -19,6 +19,7 @@ const (
 	infoStringKeyLang = "mdox-gen-lang"
 	infoStringKeyType = "mdox-gen-type"
 	infoStringKeyExec = "mdox-gen-exec"
+	skipExitCodeCheck = "mdox-nonzero-exit-code"
 )
 
 type genCodeBlockTransformer struct{}
@@ -37,6 +38,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return nil, errors.Wrapf(err, "parsing info string %v", string(infoString))
 	}
 	infoStringAttr := map[string]string{}
+	exitCodeSkip := false
 	for i, field := range infoFiels {
 		if val := strings.Split(field, "="); val[0] == infoStringKeyLang || val[0] == infoStringKeyType || val[0] == infoStringKeyExec {
 			if i == 0 {
@@ -46,6 +48,10 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value> %q=<value2> . Got info string %q", val[0], infoStringKeyLang, infoStringKeyType, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
+		}
+
+		if field == skipExitCodeCheck {
+			exitCodeSkip = true
 		}
 	}
 
@@ -69,6 +75,9 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		cmd.Stderr = &b
 		cmd.Stdout = &b
 		if err := cmd.Run(); err != nil {
+			if _, ok := err.(*exec.ExitError); ok && exitCodeSkip {
+				return b.Bytes(), nil
+			}
 			return nil, errors.Wrapf(err, "run %v", execCmd)
 		}
 		return b.Bytes(), nil
