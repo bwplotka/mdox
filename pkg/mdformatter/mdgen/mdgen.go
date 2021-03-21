@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
@@ -16,10 +17,10 @@ import (
 )
 
 const (
-	infoStringKeyLang = "mdox-gen-lang"
-	infoStringKeyType = "mdox-gen-type"
-	infoStringKeyExec = "mdox-gen-exec"
-	skipExitCodeCheck = "mdox-nonzero-exit-code"
+	infoStringKeyLang     = "mdox-gen-lang"
+	infoStringKeyType     = "mdox-gen-type"
+	infoStringKeyExec     = "mdox-gen-exec"
+	infoStringKeyExitCode = "expect-exit-code"
 )
 
 type genCodeBlockTransformer struct{}
@@ -38,20 +39,15 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return nil, errors.Wrapf(err, "parsing info string %v", string(infoString))
 	}
 	infoStringAttr := map[string]string{}
-	exitCodeSkip := false
 	for i, field := range infoFiels {
-		if val := strings.Split(field, "="); val[0] == infoStringKeyLang || val[0] == infoStringKeyType || val[0] == infoStringKeyExec {
+		if val := strings.Split(field, "="); val[0] == infoStringKeyLang || val[0] == infoStringKeyType || val[0] == infoStringKeyExec || val[0] == infoStringKeyExitCode {
 			if i == 0 {
 				return nil, errors.Errorf("missing language info in fenced code block. Got info string %q", string(infoString))
 			}
 			if len(val) != 2 {
-				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value> %q=<value2> . Got info string %q", val[0], infoStringKeyLang, infoStringKeyType, string(infoString))
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value> %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyLang, infoStringKeyExitCode, infoStringKeyType, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
-		}
-
-		if field == skipExitCodeCheck {
-			exitCodeSkip = true
 		}
 	}
 
@@ -61,7 +57,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	}
 
 	if execCmd, ok := infoStringAttr[infoStringKeyExec]; ok {
-		if len(infoStringAttr) > 1 {
+		if len(infoStringAttr) > 2 {
 			return nil, errors.Errorf("got ambiguous attributes: %v. Expected format for %q is e.g ```text %q=<value> . Got info string %q", infoStringAttr, infoStringKeyExec, infoStringKeyExec, string(infoString))
 		}
 		execArgs, err := shellwords.NewParser().Parse(execCmd)
@@ -75,7 +71,8 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		cmd.Stderr = &b
 		cmd.Stdout = &b
 		if err := cmd.Run(); err != nil {
-			if _, ok := err.(*exec.ExitError); ok && exitCodeSkip {
+			expectedCode, _ := strconv.Atoi(infoStringAttr[infoStringKeyExitCode])
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == expectedCode {
 				return b.Bytes(), nil
 			}
 			return nil, errors.Wrapf(err, "run %v", execCmd)
