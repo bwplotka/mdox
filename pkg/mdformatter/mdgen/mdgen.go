@@ -20,7 +20,7 @@ const (
 	infoStringKeyLang     = "mdox-gen-lang"
 	infoStringKeyType     = "mdox-gen-type"
 	infoStringKeyExec     = "mdox-gen-exec"
-	infoStringKeyExitCode = "expect-exit-code"
+	infoStringKeyExitCode = "mdox-expect-exit-code"
 )
 
 type genCodeBlockTransformer struct{}
@@ -40,12 +40,19 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	}
 	infoStringAttr := map[string]string{}
 	for i, field := range infoFiels {
-		if val := strings.Split(field, "="); val[0] == infoStringKeyLang || val[0] == infoStringKeyType || val[0] == infoStringKeyExec || val[0] == infoStringKeyExitCode {
-			if i == 0 {
-				return nil, errors.Errorf("missing language info in fenced code block. Got info string %q", string(infoString))
-			}
+		val := strings.Split(field, "=")
+		if i == 0 && len(val) == 2 {
+			return nil, errors.Errorf("missing language info in fenced code block. Got info string %q", string(infoString))
+		}
+		switch val[0] {
+		case infoStringKeyExec, infoStringKeyExitCode:
 			if len(val) != 2 {
-				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value> %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyLang, infoStringKeyExitCode, infoStringKeyType, string(infoString))
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyExitCode, infoStringKeyExec, string(infoString))
+			}
+			infoStringAttr[val[0]] = val[1]
+		case infoStringKeyLang, infoStringKeyType:
+			if len(val) != 2 {
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyLang, infoStringKeyType, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
 		}
