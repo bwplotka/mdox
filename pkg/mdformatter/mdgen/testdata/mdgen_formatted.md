@@ -30,3 +30,7 @@ The configuration format is the following:
 test output2
 newline
 ```
+
+```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
+test output3
+```

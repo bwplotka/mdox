@@ -34,3 +34,7 @@ alertmanagers:
 - http_config:
   api_version: v1
 ```
+
+```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
+abc
+```
