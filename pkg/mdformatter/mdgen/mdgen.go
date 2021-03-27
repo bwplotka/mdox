@@ -4,8 +4,10 @@
 package mdgen
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -21,6 +23,8 @@ const (
 	infoStringKeyType     = "mdox-gen-type"
 	infoStringKeyExec     = "mdox-gen-exec"
 	infoStringKeyExitCode = "mdox-expect-exit-code"
+	infoStringKeyFile     = "mdox-gen-file"
+	infoStringKeyLines    = "mdox-gen-lines"
 )
 
 type genCodeBlockTransformer struct{}
@@ -55,6 +59,11 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyLang, infoStringKeyType, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
+		case infoStringKeyFile, infoStringKeyLines:
+			if len(val) != 2 {
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyFile, infoStringKeyLines, string(infoString))
+			}
+			infoStringAttr[val[0]] = val[1]
 		}
 	}
 
@@ -63,6 +72,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return code, nil
 	}
 
+	// Code fence with command.
 	if execCmd, ok := infoStringAttr[infoStringKeyExec]; ok {
 		if len(infoStringAttr) > 2 {
 			return nil, errors.Errorf("got ambiguous attributes: %v. Expected format for %q is e.g ```text %q=<value> . Got info string %q", infoStringAttr, infoStringKeyExec, infoStringKeyExec, string(infoString))
@@ -87,6 +97,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return b.Bytes(), nil
 	}
 
+	// Code fence with config gen.
 	lang, langOk := infoStringAttr[infoStringKeyLang]
 	typePath, typOk := infoStringAttr[infoStringKeyType]
 	if typOk || langOk {
@@ -100,6 +111,53 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 			return nil, errors.Errorf("expected language a first element of info string got %q; Got info string %q", lang, string(infoString))
 		}
 	}
+
+	// Code fence with file.
+	fileToCopy, fileOk := infoStringAttr[infoStringKeyFile]
+	linesToCopy, lineOk := infoStringAttr[infoStringKeyLines]
+	if fileOk {
+		file, err := os.Open(fileToCopy)
+		if err != nil {
+			return nil, errors.Errorf("file could not be opened, ensure file path: %q is correct. Got info string %q", infoStringKeyFile, string(infoString))
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		scanner.Split(bufio.ScanLines)
+		var text []byte
+
+		switch lineOk {
+		case true:
+			val := strings.Split(linesToCopy, "-")
+			start, errStart := strconv.Atoi(val[0])
+			if errStart != nil {
+				return nil, errors.Errorf("start line value isn't a number: %q. Got info string %q", val[0], string(infoString))
+			}
+			end, errEnd := strconv.Atoi(val[1])
+			if errEnd != nil {
+				return nil, errors.Errorf("end line value isn't a number: %q. Got info string %q", val[1], string(infoString))
+			}
+			if start >= end {
+				return nil, errors.Errorf("line number range isn't valid: %q-%q. Got info string %q", val[0], val[1], string(infoString))
+			}
+			line := 0
+
+			for scanner.Scan() {
+				if line >= start && line <= end {
+					text = append(text, scanner.Bytes()...)
+					text = append(text, "\n"...)
+				}
+				line++
+			}
+		case false:
+			for scanner.Scan() {
+				text = append(text, scanner.Bytes()...)
+				text = append(text, "\n"...)
+			}
+		}
+		return text, nil
+	}
+
 	panic("should never get here")
 }
 
