@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strconv"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
@@ -117,8 +118,16 @@ func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[s
 			// Loop through all nested keys.
 			_, _ = fmt.Fprintf(b, "\n%v:", k)
 			for key, val := range frontMatterMap {
+				if v, ok := val.(string); ok {
+					_, _ = fmt.Fprintf(b, "\n  %v: %v", key, strconv.Quote(v))
+					continue
+				}
 				_, _ = fmt.Fprintf(b, "\n  %v: %v", key, val)
 			}
+			continue
+		}
+		if f, ok := frontMatter[k].(string); ok {
+			_, _ = fmt.Fprintf(b, "\n%v: %v", k, strconv.Quote(f))
 			continue
 		}
 		_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])

@@ -1,15 +1,19 @@
 --- testdata/not_formatted.md
 +++ testdata/not_formatted.md (formatted)
-@@ -0,10 +0,8 @@
+@@ -0,13 +0,11 @@
  ---
 +weight: 1
-+type: docs
- title: Quick Tutorial
++type: "docs"
+-title: Quick Tutorial
++title: "Quick Tutorial"
 -type: docs
++slug: "/quick-tutorial.md"
 -menu: thanos
++menu: "thanos"
+-excerpt: 'Thanos:'
 -weight: 1
- slug: /quick-tutorial.md
-+menu: thanos
+-slug: /quick-tutorial.md
++excerpt: "Thanos:"
  ---
 
  # Quick Tutorial
@@ -36,7 +40,7 @@
 
  Thanos bases itself on vanilla [Prometheus](https://prometheus.io/) (v2.2.1+). We plan to support *all* Prometheus version beyond this version.
 
-@@ -76,4 +74,4 @@
+@@ -77,4 +75,4 @@
 
  If you are not interested in backing up any data, the `--objstore.config-file` flag can simply be omitted.
 
@@ -54,7 +58,7 @@
 
  Let's extend the Sidecar in the previous section to connect to a Prometheus server, and expose the Store API.
 
-@@ -95,4 +93,2 @@
+@@ -96,4 +94,2 @@
      --grpc-address              0.0.0.0:19090              # GRPC endpoint for StoreAPI
  ```
 
@@ -70,7 +74,7 @@
 
  #### External Labels
 
-@@ -167,5 +163,3 @@
+@@ -168,5 +164,3 @@
 
  Go to the configured HTTP address, and you should now be able to query across all Prometheus instances and receive de-duplicated data.
 
@@ -89,7 +93,7 @@
 
  ```bash
  thanos query \
-@@ -188,4 +182,2 @@
+@@ -189,4 +183,2 @@
 
  Read more details [here](service-discovery.md).
 
@@ -105,7 +109,7 @@
 
  ```bash
  thanos store \
-@@ -206,1 +198,1 @@
+@@ -207,1 +199,1 @@
 
  The store gateway occupies small amounts of disk space for caching basic information about data in the object storage. This will rarely exceed more than a few gigabytes and is used to improve restart times. It is useful but not required to preserve it across restarts.
 
@@ -114,7 +118,7 @@
 
  ### [Compactor](components/compact.md)
 
-@@ -223,8 +215,4 @@
+@@ -224,8 +216,4 @@
 
  The compactor is not in the critical path of querying or data backup. It can either be run as a periodic batch job or be left running to always compact data as soon as possible. It is recommended to provide 100-300GB of local disk space for data processing.
 
@@ -139,7 +143,7 @@
  ```$
  usage: thanos rule [<flags>]
 
-@@ -411,1 +399,0 @@
+@@ -412,1 +400,0 @@
 
  The configuration format is the following:
 
@@ -147,7 +151,7 @@
  ```yaml
  alertmanagers:
  - http_config:
-@@ -437,1 +424,4 @@
+@@ -438,1 +425,4 @@
    timeout: 10s
    api_version: v1
  ```

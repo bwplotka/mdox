@@ -2,6 +2,7 @@
 title: Quick Tutorial
 type: docs
 menu: thanos
+excerpt: 'Thanos:'
 weight: 1
 slug: /quick-tutorial.md
 ---
