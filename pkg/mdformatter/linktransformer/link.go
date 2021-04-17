@@ -255,7 +255,12 @@ type localLinksCache map[string]*[]string
 
 // Lookup looks for given link in local anchorDir. It returns error if link can't be found.
 func (l localLinksCache) Lookup(absLink string) error {
-	absLinkSplit := strings.Split(absLink, "#")
+	splitWith := "#"
+	if strings.Contains(absLink, "/#") {
+		splitWith = "/#"
+	}
+
+	absLinkSplit := strings.Split(absLink, splitWith)
 	ids, ok := l[absLinkSplit[0]]
 	if !ok {
 		if err := l.addRelLinks(absLinkSplit[0]); err != nil {
@@ -354,6 +359,9 @@ func absLocalLink(anchorDir string, docPath string, destination string) string {
 		newDest = filepath.Base(docPath)
 	case strings.HasPrefix(destination, "#"):
 		newDest = filepath.Base(docPath) + destination
+	case strings.Contains(destination, "/#"):
+		destination = strings.Replace(destination, "/#", "#", 1)
+		return filepath.Join(anchorDir, destination)
 	}
 	return filepath.Join(filepath.Dir(docPath), newDest)
 }

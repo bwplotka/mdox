@@ -32,7 +32,7 @@ const (
 
 [10](http://myproject.example.com/tip/a/does_not_exists_file.md) [11](https://myproject.example.com/tip/a/does_not_exists_file2) [12](http://myproject.example.com/tip/does_not_exists/does_not_exists_dir.md)
 
-[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md)
+[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md) [16](doc2.md/#yolo-2)
 `
 )
 
@@ -68,8 +68,8 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 
  [10](http://myproject.example.com/tip/a/does_not_exists_file.md) [11](https://myproject.example.com/tip/a/does_not_exists_file2) [12](http://myproject.example.com/tip/does_not_exists/does_not_exists_dir.md)
 
--[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md)
-+[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.)
+-[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md) [16](doc2.md/#yolo-2)
++[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.) [16](../doc2.md#yolo-2)
 
 `, tmpDir, tmpDir), diff.String())
 	})
@@ -86,8 +86,8 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 
  [10](http://myproject.example.com/tip/a/does_not_exists_file.md) [11](https://myproject.example.com/tip/a/does_not_exists_file2) [12](http://myproject.example.com/tip/does_not_exists/does_not_exists_dir.md)
 
--[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md)
-+[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.)
+-[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md) [16](doc2.md/#yolo-2)
++[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.) [16](../doc2.md#yolo-2)
 
 `, tmpDir, tmpDir), diff.String())
 	})
@@ -112,8 +112,8 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 
  [10](http://myproject.example.com/tip/a/does_not_exists_file.md) [11](https://myproject.example.com/tip/a/does_not_exists_file2) [12](http://myproject.example.com/tip/does_not_exists/does_not_exists_dir.md)
 
--[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md)
-+[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.)
+-[11](/doc2.md) [12](/a/doc.md#yolo) [13](../doc2.md) [14](../a/../a/../a/../a/doc.md) [15](doc.md) [16](doc2.md/#yolo-2)
++[11](../doc2.md) [12](#yolo) [13](../doc2.md) [14](.) [15](.) [16](../doc2.md#yolo-2)
 
 `, tmpDir, tmpDir), diff.String())
 	})
