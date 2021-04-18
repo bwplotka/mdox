@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"math"
 	"os"
 	"os/exec"
 	"strconv"
@@ -72,6 +73,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return code, nil
 	}
 
+	_, execkeyOk := infoStringAttr[infoStringKeyExec]
+	_, filekeyOk := infoStringAttr[infoStringKeyFile]
+	if execkeyOk && filekeyOk {
+		return nil, errors.Errorf("got ambiguous instructions. %q and %q can't be used together. Separate code blocks expected. Got info string %q", infoStringKeyExec, infoStringKeyFile, string(infoString))
+	}
+
 	// Code fence with command.
 	if execCmd, ok := infoStringAttr[infoStringKeyExec]; ok {
 		if len(infoStringAttr) > 2 {
@@ -118,42 +125,41 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	if fileOk {
 		file, err := os.Open(fileToCopy)
 		if err != nil {
-			return nil, errors.Errorf("file could not be opened, ensure file path: %q is correct. Got info string %q", infoStringKeyFile, string(infoString))
+			return nil, errors.Errorf("file could not be opened, ensure file path: %q is correct. Got info string %q", infoStringAttr[infoStringKeyFile], string(infoString))
 		}
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
 		scanner.Split(bufio.ScanLines)
 		var text []byte
+		line := 1
+		start := 1
+		end := math.MaxInt64
 
-		switch lineOk {
-		case true:
-			val := strings.Split(linesToCopy, "-")
-			start, errStart := strconv.Atoi(val[0])
-			if errStart != nil {
+		if lineOk {
+			val := strings.Split(linesToCopy, ":")
+			start, err = strconv.Atoi(val[0])
+			if err != nil {
 				return nil, errors.Errorf("start line value isn't a number: %q. Got info string %q", val[0], string(infoString))
 			}
-			end, errEnd := strconv.Atoi(val[1])
-			if errEnd != nil {
+			end, err = strconv.Atoi(val[1])
+			if err != nil {
 				return nil, errors.Errorf("end line value isn't a number: %q. Got info string %q", val[1], string(infoString))
 			}
 			if start >= end {
 				return nil, errors.Errorf("line number range isn't valid: %q-%q. Got info string %q", val[0], val[1], string(infoString))
 			}
-			line := 0
+		}
 
-			for scanner.Scan() {
-				if line >= start && line <= end {
-					text = append(text, scanner.Bytes()...)
-					text = append(text, "\n"...)
-				}
-				line++
-			}
-		case false:
-			for scanner.Scan() {
+		for scanner.Scan() {
+			if line >= start && line <= end {
 				text = append(text, scanner.Bytes()...)
 				text = append(text, "\n"...)
 			}
+			line++
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, errors.Errorf("scanner couldn't read: %v", err)
 		}
 		return text, nil
 	}
