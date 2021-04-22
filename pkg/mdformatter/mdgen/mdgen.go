@@ -159,7 +159,7 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 			line++
 		}
 		if err := scanner.Err(); err != nil {
-			return nil, errors.Errorf("scanner couldn't read: %v", err)
+			return nil, errors.Wrap(err, "scanner read")
 		}
 		return text, nil
 	}

@@ -34,3 +34,16 @@ newline
 ```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
 test output3
 ```
+
+```bash mdox-gen-file="./testdata/out3.sh" mdox-gen-lines=2:4
+
+echo "test output3"
+exit 2
+```
+
+```bash mdox-gen-file="./testdata/out2.sh"
+#!/usr/bin/env bash
+
+echo "test output2"
+echo "newline"
+```
