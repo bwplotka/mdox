@@ -38,3 +38,6 @@ alertmanagers:
 ```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
 abc
 ```
+
+```bash mdox-gen-exec="sed -n '1,3p' ./testdata/out3.sh"
+```
