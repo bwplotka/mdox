@@ -73,6 +73,13 @@ For example this Readme contains `mdox --help` which is has to be auto generated
 ...
 ```
 
+This also enables auto updating snippets of code in code blocks using tools like `sed`. For example, below code block directive will auto update and insert lines 3 to 6 from main.go into code block.
+
+```markdown
+```go mdox-gen-exec="go mdox-gen-exec="sed -n '3,6p' main.go"
+...
+```
+
 You can disable this feature by specifying `--code.disable-directives`
 
 ### Installing

@@ -34,3 +34,9 @@ newline
 ```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
 test output3
 ```
+
+```bash mdox-gen-exec="sed -n '1,3p' ./testdata/out3.sh"
+#!/usr/bin/env bash
+
+echo "test output3"
+```
