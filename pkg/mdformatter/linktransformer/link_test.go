@@ -146,6 +146,23 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 	})
 
+	t.Run("check valid but same link in diff files", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
+		testFile2 := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link2.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, ioutil.WriteFile(testFile2, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+	})
+
 	t.Run("check valid local links", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
