@@ -31,6 +31,10 @@ var (
 	IDNotFoundErr   = LookupError(errors.New("file exists, but does not have such id"))
 )
 
+const (
+	originalURLKey = "originalURLKey"
+)
+
 type chain struct {
 	chain []mdformatter.LinkTransformer
 }
@@ -153,17 +157,17 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (m
 	v.c.OnRequest(func(request *colly.Request) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		request.Ctx.Put("originalURL", request.URL.String())
+		request.Ctx.Put(originalURLKey, request.URL.String())
 	})
 	v.c.OnScraped(func(response *colly.Response) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		v.remoteLinks[response.Ctx.Get("originalURL")] = nil
+		v.remoteLinks[response.Ctx.Get(originalURLKey)] = nil
 	})
 	v.c.OnError(func(response *colly.Response, err error) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		v.remoteLinks[response.Ctx.Get("originalURL")] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 	})
 	return v, nil
 }
