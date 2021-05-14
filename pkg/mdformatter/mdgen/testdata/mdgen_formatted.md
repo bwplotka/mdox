@@ -1,6 +1,6 @@
 # Quick Tutorial
 
-```bash mdox-gen-exec="bash ./testdata/out.sh"
+```bash mdox-exec="bash ./testdata/out.sh"
 test output
 ```
 
@@ -26,16 +26,16 @@ The `--alertmanagers.config` and `--alertmanagers.config-file` flags allow speci
 
 The configuration format is the following:
 
-```yaml mdox-gen-exec="bash ./testdata/out2.sh"
+```yaml mdox-exec="bash ./testdata/out2.sh"
 test output2
 newline
 ```
 
-```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
+```bash mdox-expect-exit-code=2 mdox-exec="bash ./testdata/out3.sh"
 test output3
 ```
 
-```bash mdox-gen-exec="sed -n '1,3p' ./testdata/out3.sh"
+```bash mdox-exec="sed -n '1,3p' ./testdata/out3.sh"
 #!/usr/bin/env bash
 
 echo "test output3"

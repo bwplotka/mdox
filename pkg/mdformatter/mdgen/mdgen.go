@@ -19,7 +19,7 @@ import (
 const (
 	infoStringKeyLang     = "mdox-gen-lang"
 	infoStringKeyType     = "mdox-gen-type"
-	infoStringKeyExec     = "mdox-gen-exec"
+	infoStringKeyExec     = "mdox-exec"
 	infoStringKeyExitCode = "mdox-expect-exit-code"
 )
 

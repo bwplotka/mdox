@@ -118,7 +118,7 @@ func registerFmt(_ context.Context, app *extkingpin.App) {
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
 
 	disableGenCodeBlocksDirectives := cmd.Flag("code.disable-directives", `If false, fmt will parse custom fenced code directives prefixed with 'mdox-gen' to autogenerate code snippets. For example:
-	`+"```"+`<lang> mdox-gen-exec="<executable + arguments>"
+	`+"```"+`<lang> mdox-exec="<executable + arguments>"
 This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.`).Bool()
 	anchorDir := cmd.Flag("anchor-dir", "Anchor directory for all transformers. PWD is used if flag is not specified.").ExistingDir()
 	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists)."+
