@@ -1,7 +1,7 @@
 Quick Tutorial
 ==============
 
-```bash mdox-gen-exec="bash ./testdata/out.sh"
+```bash mdox-exec="bash ./testdata/out.sh"
 a
 adf
 ```
@@ -29,15 +29,15 @@ The `--alertmanagers.config` and `--alertmanagers.config-file` flags allow speci
 
 The configuration format is the following:
 
-```yaml mdox-gen-exec="bash ./testdata/out2.sh"
+```yaml mdox-exec="bash ./testdata/out2.sh"
 alertmanagers:
 - http_config:
   api_version: v1
 ```
 
-```bash mdox-expect-exit-code=2 mdox-gen-exec="bash ./testdata/out3.sh"
+```bash mdox-expect-exit-code=2 mdox-exec="bash ./testdata/out3.sh"
 abc
 ```
 
-```bash mdox-gen-exec="sed -n '1,3p' ./testdata/out3.sh"
+```bash mdox-exec="sed -n '1,3p' ./testdata/out3.sh"
 ```

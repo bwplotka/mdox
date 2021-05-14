@@ -21,7 +21,7 @@ Just run `mdox fmt` and pass markdown files (or glob matching those).
 
 For example this README is formatted by the CI on every PR using [`mdox fmt -l *.md` command](https://github.com/bwplotka/mdox/blob/9e183714070f464b1ef089da3df8048aff1abeda/Makefile#L59).
 
-```bash mdox-gen-exec="mdox fmt --help"
+```bash mdox-exec="mdox fmt --help"
 usage: mdox fmt [<flags>] <files>...
 
 Formats in-place given markdown files uniformly following GFM (Github Flavored
@@ -39,7 +39,7 @@ Flags:
                                  directives prefixed with 'mdox-gen' to
                                  autogenerate code snippets. For example:
                                  
-                                   ```<lang> mdox-gen-exec="<executable + arguments>"
+                                   ```<lang> mdox-exec="<executable + arguments>"
                                  
                                  This directive runs executable with arguments
                                  and put its stderr and stdout output inside
@@ -64,19 +64,19 @@ Args:
 
 ### Code Generation
 
-It's not uncommon that documentation is explaining code or configuration snippets. One of the challenges of such documentation is keeping it up to date. This is where `mdox` code block directives comes handy! To ensure mdox will auto update code snippet add `mdox-gen-exec="<whatever command you want take output from>"` after language directive on code block.
+It's not uncommon that documentation is explaining code or configuration snippets. One of the challenges of such documentation is keeping it up to date. This is where `mdox` code block directives comes handy! To ensure mdox will auto update code snippet add `mdox-exec="<whatever command you want take output from>"` after language directive on code block.
 
 For example this Readme contains `mdox --help` which is has to be auto generated on every PR:
 
 ```markdown
-``` bash mdox-gen-exec="mdox fmt --help"
+``` bash mdox-exec="mdox fmt --help"
 ...
 ```
 
 This also enables auto updating snippets of code in code blocks using tools like `sed`. For example, below code block directive will auto update and insert lines 3 to 6 from main.go into code block.
 
 ```markdown
-```go mdox-gen-exec="go mdox-gen-exec="sed -n '3,6p' main.go"
+```go mdox-exec="sed -n '3,6p' main.go"
 ...
 ```
 
