@@ -4,16 +4,23 @@
 
 `mdox` (spelled as `md docs`) is a CLI for maintaining automated, high quality project documentation and website leveraging [Github Flavored Markdown](https://github.github.com/gfm/) and git.
 
+This project can be used both as CLI as well as library.
+
 ## Goals
 
 Allow projects to have self-updating up-to-date documentation available in both markdown (e.g readable from GitHub) and static HTML. Hosted in the same repository as code and integrated with Pull Requests CI, hosting CD and code generation.
 
 ## Features
 
-* Enhanced amd consistent formatting for markdown files, focused on `.md` code readability.
-* Auto generation of code block content based on `mdoc-exec` directives (see [#code-generation](#code-generation)).
+* Enhanced and consistent formatting for markdown files in [GFM](https://github.github.com/gfm/) format, focused on readability.
+* Auto generation of code block content based on `mdoc-exec` directives (see [#code-generation](#code-generation)). Useful for:
+  * Generating help output from CLI --help
+  * Generating example YAML from Go configuration struct (+comments)
 * Robust and fast relative and remote link checking.
-* "Localizing" links to relative docs if specified (useful for multi-domain websites or multi-version doc).
+* Website integration:
+  * "Localizing" links to relative docs if specified (useful for multi-domain websites or multi-version doc).
+    * This allows smooth integration with static document websites like [Docusaurus](https://docusaurus.io/) or [hugo](https://gohugo.io) based themes!
+  * Flexible pre-processing allowing easy to use GitHub experience as well as website.
 
 ## Usage
 

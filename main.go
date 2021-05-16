@@ -18,6 +18,7 @@ import (
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/version"
+	"github.com/bwplotka/mdox/pkg/web"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -203,14 +204,10 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 }
 
 func registerWeb(_ context.Context, app *extkingpin.App) {
-	cmd := app.Command("web", "Tools for generating static HTML website based on https://gohugo.io/ on every PR with preview")
-	genCmd := cmd.Command("gen", "Generate versioned docs")
-
-	_ = genCmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
-
-	// TODO(bwplotka): Generate versioned docs used for Hugo. Open question: Hugo specific? How to adjust links? Should fmt and this be
-	// the same?
+	cmd := app.Command("web", "Pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options")
+	cfg := cmd.Flag("config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/web.Config").
+		Short('c').Default(".mdox.web.yaml").ExistingFile()
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
-		return errors.New("not implemented")
+		return web.ProcessGitHubDir(ctx, logger, *cfg)
 	})
 }

@@ -17,4 +17,5 @@ require (
 	github.com/yuin/goldmark v1.3.1
 	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )
