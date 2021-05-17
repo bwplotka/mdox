@@ -1,10 +1,10 @@
 ---
 weight: 1
-type: "docs"
-title: "Quick Tutorial"
-slug: "/quick-tutorial.md"
-menu: "thanos"
-excerpt: "Thanos:"
+type: docs
+title: Quick Tutorial
+slug: /quick-tutorial.md
+menu: thanos
+excerpt: 'Thanos:'
 ---
 
 # Quick Tutorial

@@ -1,3 +1,6 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 package transform
 
 import (
@@ -39,14 +42,14 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		return err
 	}
 
-	if c.GitIgnore {
+	if c.GitIgnored {
 		if err = ioutil.WriteFile(filepath.Join(c.OutputDir, ".gitignore"), []byte("*.*"), os.ModePerm); err != nil {
 			return err
 		}
 	}
 
 	var (
-		linkTransformer = &relLinkTransformer{outputDir: c.OutputDir, absRelNewPathByFile: map[string]string{}}
+		linkTransformer = &relLinkTransformer{outputDir: c.OutputDir, newAbsRelPathByOldAbsRelPath: map[string]string{}}
 		files           []string
 	)
 
@@ -58,13 +61,16 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		if info.IsDir() || path == c.InputDir {
 			return nil
 		}
-		files = append(files, path)
 
 		// Copy while preserving structure and tolerating custom mapping.
 		// absRelPath is an absolute path, but relatively to input dir (has `/` upfront).
 		absRelPath := strings.TrimPrefix(path, c.InputDir)
 
 		target := filepath.Join(c.OutputDir, absRelPath)
+		defer func() {
+			files = append(files, target)
+		}()
+
 		t, ok := firstMatch(absRelPath, c.Transformations)
 		if !ok {
 			level.Debug(logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
@@ -74,7 +80,7 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		var opts []mdformatter.Option
 		newAbsRelPath := newTargetAbsRelPath(absRelPath, t)
 		if newAbsRelPath != absRelPath {
-			linkTransformer.absRelNewPathByFile[path] = newAbsRelPath
+			linkTransformer.newAbsRelPathByOldAbsRelPath[absRelPath] = newAbsRelPath
 		}
 
 		target = filepath.Join(c.OutputDir, newAbsRelPath)
@@ -84,9 +90,13 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		}
 
 		if t.FrontMatter != nil {
-			firstHeader, err := readFirstHeader(path)
+			firstHeader, rest, err := popFirstHeader(path)
 			if err != nil {
 				return errors.Wrap(err, "read first header")
+			}
+
+			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
+				return err
 			}
 			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{c: t.FrontMatter, firstHeader: firstHeader}))
 		}
@@ -100,25 +110,62 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 }
 
 type relLinkTransformer struct {
-	outputDir           string
-	absRelNewPathByFile map[string]string
+	outputDir                    string
+	newAbsRelPathByOldAbsRelPath map[string]string
 }
 
 func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) ([]byte, error) {
-	d := string(destination)
-	if strings.Contains(d, "://") || filepath.IsAbs(d) {
+	split := strings.Split(string(destination), "#")
+	dest := split[0]
+	if strings.Contains(dest, "://") || filepath.IsAbs(dest) || strings.HasPrefix(string(destination), "#") {
 		return destination, nil
 	}
 	// TODO(bwplotka): Check if links are outside?
-
-	// absTargetRelPath is an absolute path, but relatively to input dir (has `/` upfront).
-	absTargetRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
-
-	if absNewRelPath, ok := r.absRelNewPathByFile[filepath.Join(absTargetRelPath, d)]; ok {
-		str, err := filepath.Rel(ctx.Filepath, filepath.Join(r.outputDir, absNewRelPath))
-		return []byte(str), err
+	currentAbsRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
+	if filepath.Join(currentAbsRelPath, dest) == ctx.Filepath {
+		// Pointing to self.
+		_, file := filepath.Split(ctx.Filepath)
+		if len(split) > 1 {
+			return []byte(file + "#" + split[1]), nil
+		}
+		return []byte(file), nil
 	}
-	return destination, nil
+
+	currentAbsRelDir := filepath.Dir(currentAbsRelPath)
+
+	// Do we changed?
+	change := ""
+	for n, old := range r.newAbsRelPathByOldAbsRelPath {
+		if old != currentAbsRelPath {
+			continue
+		}
+		c, err := filepath.Rel(filepath.Dir(old), filepath.Dir(n))
+		if err != nil {
+			return nil, err
+		}
+		change = c
+		break
+	}
+
+	adjustedAbsRelDir := filepath.Join(currentAbsRelDir, change)
+	adjustedAbsRelDest := filepath.Join(adjustedAbsRelDir, dest)
+
+	// Does the link points to something that changed?
+	if absNewRelPath, ok := r.newAbsRelPathByOldAbsRelPath[adjustedAbsRelDest]; ok {
+		adjustedAbsRelDest = absNewRelPath
+	}
+
+	newDest, err := filepath.Rel(currentAbsRelDir, adjustedAbsRelDest)
+	if err != nil {
+		return nil, err
+	}
+	if newDest == "." {
+		newDest = ""
+	}
+	if len(split) > 1 {
+		return []byte(strings.TrimPrefix(newDest, "/") + "#" + split[1]), nil
+	}
+	return []byte(strings.TrimPrefix(newDest, "/")), nil
 }
 
 func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
@@ -141,11 +188,12 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 	}); err != nil {
 		return nil, err
 	}
+
 	m := map[string]interface{}{}
 	if err := yaml.Unmarshal(b.Bytes(), m); err != nil {
 		return nil, errors.Wrapf(err, "generated template for %v is not a valid yaml", ctx.Filepath)
 	}
-	return mdformatter.FormatFrontMatter(m), nil
+	return mdformatter.FormatFrontMatter(m)
 }
 
 func (f *frontMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
@@ -201,20 +249,29 @@ func copyFiles(src, dst string) (err error) {
 	return err
 }
 
-// TODO(bwplotka): Use formatter.
-func readFirstHeader(path string) (string, error) {
+// TODO(bwplotka): Use formatter, remove the title etc.
+// Super hacky for now.
+func popFirstHeader(path string) (_ string, rest []byte, err error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", nil
+		return "", nil, err
 	}
-	defer func() { _ = file.Close() }()
+	defer errcapture.Close(&err, file, "close file")
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		text := scanner.Text()
 		if strings.HasPrefix(text, "#") {
-			return text, scanner.Err()
+			if _, err := file.Seek(int64(len(text)), 0); err != nil {
+				return "", nil, errors.Wrap(err, "seek")
+			}
+			rest, err := ioutil.ReadAll(file)
+			if err != nil {
+				return "", nil, errors.Wrap(err, "read")
+			}
+
+			return strings.TrimPrefix(text, "# "), rest, scanner.Err()
 		}
 	}
-	return "<no header found>", nil
+	return "", nil, errors.New("No header found")
 }

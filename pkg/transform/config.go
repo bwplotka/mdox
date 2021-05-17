@@ -1,6 +1,10 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
 package transform
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,8 +23,8 @@ type Config struct {
 
 	Transformations []*TransformationConfig
 
-	// GitIgnore specifies if output dir should be git ignored or not.
-	GitIgnore bool `yaml:"GitIgnore"`
+	// GitIgnored specifies if output dir should be git ignored or not.
+	GitIgnored bool `yaml:"gitIgnored"`
 }
 
 type TransformationConfig struct {
@@ -64,7 +68,9 @@ func parseConfigFile(configFile string) (Config, error) {
 
 func ParseConfig(c []byte) (Config, error) {
 	cfg := Config{}
-	if err := yaml.Unmarshal(c, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(c))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, errors.Wrapf(err, "parsing template content %q", string(c))
 	}
 
