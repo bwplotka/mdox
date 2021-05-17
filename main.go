@@ -17,8 +17,8 @@ import (
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
+	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/bwplotka/mdox/pkg/version"
-	"github.com/bwplotka/mdox/pkg/web"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -67,7 +67,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app)
-	registerWeb(ctx, app)
+	registerTransform(ctx, app)
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
@@ -203,11 +203,11 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 	return anchorDir, nil
 }
 
-func registerWeb(_ context.Context, app *extkingpin.App) {
-	cmd := app.Command("web", "Pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options")
-	cfg := cmd.Flag("config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/web.Config").
-		Short('c').Default(".mdox.web.yaml").ExistingFile()
+func registerTransform(_ context.Context, app *extkingpin.App) {
+	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
+	cfg := cmd.Flag("config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config").
+		Short('c').Default(".mdox.yaml").ExistingFile()
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
-		return web.ProcessGitHubDir(ctx, logger, *cfg)
+		return transform.Dir(ctx, logger, *cfg)
 	})
 }

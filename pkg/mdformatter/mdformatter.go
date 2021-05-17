@@ -71,7 +71,7 @@ func WithLinkTransformer(l LinkTransformer) Option {
 	}
 }
 
-// WithMetaBlockTransformer allows you to override the default CodeBlockTransformer.
+// WithCodeBlockTransformer allows you to override the default CodeBlockTransformer.
 func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	return func(m *Formatter) {
 		m.cb = cb
@@ -81,7 +81,7 @@ func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 func New(ctx context.Context, opts ...Option) *Formatter {
 	f := &Formatter{
 		ctx: ctx,
-		fm:  FormatFrontMatter{},
+		fm:  FormatFrontMatterTransformer{},
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -97,11 +97,15 @@ func (RemoveFrontMatter) TransformFrontMatter(_ SourceContext, _ map[string]inte
 
 func (RemoveFrontMatter) Close() error { return nil }
 
-type FormatFrontMatter struct{}
+type FormatFrontMatterTransformer struct{}
 
-func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
+func (FormatFrontMatterTransformer) TransformFrontMatter(_ SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
+	return FormatFrontMatter(frontMatter), nil
+}
+
+func FormatFrontMatter(frontMatter map[string]interface{}) []byte {
 	if len(frontMatter) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	keys := make([]string, 0, len(frontMatter))
@@ -133,10 +137,10 @@ func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[s
 		_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])
 	}
 	_, _ = b.Write([]byte("\n---\n\n"))
-	return b.Bytes(), nil
+	return b.Bytes()
 }
 
-func (FormatFrontMatter) Close(SourceContext) error { return nil }
+func (FormatFrontMatterTransformer) Close(SourceContext) error { return nil }
 
 type Diffs []gitdiff.Diff
 

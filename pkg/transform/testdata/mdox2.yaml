@@ -1,0 +1,36 @@
+version: 1
+
+inputDir: "testdata/testproj"
+outputDir: "testdata/tmp/2"
+
+gitIgnored: true
+
+transformations:
+  - glob: "/README.md"
+    path: _index.md
+    frontMatter:
+      template: |
+        title: "{{ .FirstHeader }}"
+
+        cascade:
+        - type: "docs"
+          _target:
+            path: "/**"
+
+  - glob: "/doc.md"
+    frontMatter:
+      template: |
+        title: "{{ .FirstHeader }}"
+
+  - glob: "/Team/doc.md"
+    path: inner/doc.md
+    frontMatter:
+      template: |
+        title: "{{ .FirstHeader }}"
+        yolo: "yolo"
+
+  - glob: "**/README.md"
+    path: /test1/_index.md
+    frontMatter:
+      template: |
+        title: "{{ .FirstHeader }}"
