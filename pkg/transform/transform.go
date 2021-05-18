@@ -28,24 +28,31 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		return err
 	}
 
-	_, err = os.Stat(c.OutputDir)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
+	for _, d := range []string{c.OutputDir, c.OutputStaticDir} {
+		if d == "" {
+			continue
+		}
 
-	if !os.IsNotExist(err) {
-		if err := os.RemoveAll(c.OutputDir); err != nil {
+		_, err = os.Stat(d)
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-	}
-	if err := os.MkdirAll(c.OutputDir, os.ModePerm); err != nil {
-		return err
-	}
 
-	if c.GitIgnored {
-		if err = ioutil.WriteFile(filepath.Join(c.OutputDir, ".gitignore"), []byte("*.*"), os.ModePerm); err != nil {
+		if !os.IsNotExist(err) {
+			if err := os.RemoveAll(d); err != nil {
+				return err
+			}
+		}
+		if err := os.MkdirAll(d, os.ModePerm); err != nil {
 			return err
 		}
+
+		if c.GitIgnored {
+			if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*.*"), os.ModePerm); err != nil {
+				return err
+			}
+		}
+
 	}
 
 	var (
@@ -66,20 +73,34 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			return nil
 		}
 
-		// Copy while preserving structure and tolerating custom mapping.
 		// absRelPath is an absolute path, but relatively to input dir (has `/` upfront).
 		absRelPath := strings.TrimPrefix(path, c.InputDir)
 
+		if filepath.Ext(path) != ".md" {
+			out := c.OutputStaticDir
+			if out == "" {
+				out = c.OutputDir
+			}
+			level.Debug(logger).Log("msg", "copying static file", "in", "target", filepath.Join(out, absRelPath))
+			return copyFiles(path, filepath.Join(out, absRelPath))
+		}
+
+		// Copy while preserving structure and tolerating custom mapping.
 		target := filepath.Join(c.OutputDir, absRelPath)
+		t, ok := firstMatch(absRelPath, c.Transformations)
+		if !ok {
+			files = append(files, target)
+			level.Debug(logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
+			return copyFiles(path, target)
+		}
+
+		if t.Skip {
+			return nil
+		}
+
 		defer func() {
 			files = append(files, target)
 		}()
-
-		t, ok := firstMatch(absRelPath, c.Transformations)
-		if !ok {
-			level.Debug(logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
-			return copyFiles(path, filepath.Join(c.OutputDir, absRelPath))
-		}
 
 		var opts []mdformatter.Option
 		newAbsRelPath := newTargetAbsRelPath(absRelPath, t)

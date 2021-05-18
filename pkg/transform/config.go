@@ -29,10 +29,12 @@ const (
 )
 
 type Config struct {
-	Version   int
-	InputDir  string `yaml:"inputDir"`
-	OutputDir string `yaml:"outputDir"`
+	Version         int
+	InputDir        string `yaml:"inputDir"`
+	OutputDir       string `yaml:"outputDir"`
+	OutputStaticDir string `yaml:"outputStaticDir"`
 
+	// Transformations to apply for any file with .md extension.
 	Transformations []*TransformationConfig
 
 	// GitIgnored specifies if output dir should be git ignored or not.
