@@ -98,10 +98,18 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
 				return err
 			}
+			_, originFilename := filepath.Split(path)
+			_, targetFilename := filepath.Split(target)
 			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
-				c:                 t.FrontMatter,
-				originFirstHeader: firstHeader,
-				originLastMod:     info.ModTime().String(),
+				c: t.FrontMatter,
+				origin: FrontMatterOrigin{
+					Filename:    originFilename,
+					FirstHeader: firstHeader,
+					LastMod:     info.ModTime().String(),
+				},
+				target: FrontMatterTarget{
+					FileName: targetFilename,
+				},
 			}))
 		}
 		return mdformatter.Format(ctx, logger, []string{target}, opts...)
@@ -178,20 +186,30 @@ type frontMatterTransformer struct {
 	c *FrontMatterConfig
 
 	// Vars.
-	originFirstHeader string
-	originLastMod     string
+	origin FrontMatterOrigin
+	target FrontMatterTarget
+}
+
+type FrontMatterOrigin struct {
+	Filename    string
+	FirstHeader string
+	LastMod     string
+}
+
+type FrontMatterTarget struct {
+	FileName string
 }
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
 	b := bytes.Buffer{}
 	if err := f.c._template.Execute(&b, struct {
-		OriginFirstHeader string
-		OriginLastMod     string
-		FrontMatter       map[string]interface{}
+		Origin      FrontMatterOrigin
+		Target      FrontMatterTarget
+		FrontMatter map[string]interface{}
 	}{
-		OriginFirstHeader: f.originFirstHeader,
-		OriginLastMod:     f.originLastMod,
-		FrontMatter:       frontMatter,
+		Origin:      f.origin,
+		Target:      f.target,
+		FrontMatter: frontMatter,
 	}); err != nil {
 		return nil, err
 	}
