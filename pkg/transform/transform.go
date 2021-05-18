@@ -98,7 +98,11 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
 				return err
 			}
-			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{c: t.FrontMatter, firstHeader: firstHeader}))
+			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
+				c:                 t.FrontMatter,
+				originFirstHeader: firstHeader,
+				originLastMod:     info.ModTime().String(),
+			}))
 		}
 		return mdformatter.Format(ctx, logger, []string{target}, opts...)
 	}); err != nil {
@@ -174,17 +178,20 @@ type frontMatterTransformer struct {
 	c *FrontMatterConfig
 
 	// Vars.
-	firstHeader string
+	originFirstHeader string
+	originLastMod     string
 }
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
 	b := bytes.Buffer{}
 	if err := f.c._template.Execute(&b, struct {
-		FirstHeader string
-		FrontMatter map[string]interface{}
+		OriginFirstHeader string
+		OriginLastMod     string
+		FrontMatter       map[string]interface{}
 	}{
-		FirstHeader: f.firstHeader,
-		FrontMatter: frontMatter,
+		OriginFirstHeader: f.originFirstHeader,
+		OriginLastMod:     f.originLastMod,
+		FrontMatter:       frontMatter,
 	}); err != nil {
 		return nil, err
 	}

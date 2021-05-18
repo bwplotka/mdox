@@ -16,7 +16,7 @@ import (
 
 func TestTransform(t *testing.T) {
 	const (
-		tmpDir   = "./tmp"
+		tmpDir   = "testdata/tmp"
 		testData = "testdata"
 	)
 	defer func() { _ = os.RemoveAll(tmpDir) }()

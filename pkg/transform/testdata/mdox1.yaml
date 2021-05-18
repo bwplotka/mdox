@@ -10,7 +10,7 @@ transformations:
     path: _index.md
     frontMatter:
       template: |
-        title: "{{ .FirstHeader }}"
+        title: "{{ .OriginFirstHeader }}"
 
         cascade:
         - type: "docs"
@@ -20,4 +20,5 @@ transformations:
   - glob: "**/README.md"
     frontMatter:
       template: |
-        title: "{{ .FirstHeader }}"
+        title: "{{ .OriginFirstHeader }}"
+        lastmod: "{{ .OriginLastMod }}"
