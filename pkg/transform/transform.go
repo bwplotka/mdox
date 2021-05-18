@@ -171,13 +171,19 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	if err != nil {
 		return nil, err
 	}
+
 	if newDest == "." {
 		newDest = ""
+	} else {
+		// Because all links are normally files, in Hugo those are literally URL paths (kind of "dirs").
+		// This is why we need to add ../ to them.
+		newDest = filepath.Join("..", newDest)
 	}
+
 	if len(split) > 1 {
-		return []byte(strings.TrimPrefix(newDest, "/") + "#" + split[1]), nil
+		return []byte(newDest + "#" + split[1]), nil
 	}
-	return []byte(strings.TrimPrefix(newDest, "/")), nil
+	return []byte(newDest), nil
 }
 
 func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
