@@ -49,8 +49,12 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 	}
 
 	var (
-		linkTransformer = &relLinkTransformer{outputDir: c.OutputDir, newAbsRelPathByOldAbsRelPath: map[string]string{}}
-		files           []string
+		linkTransformer = &relLinkTransformer{
+			localLinksStyle:              c.LocalLinksStyle,
+			outputDir:                    c.OutputDir,
+			newAbsRelPathByOldAbsRelPath: map[string]string{},
+		}
+		files []string
 	)
 
 	// Move markdown files, preserving dir structure to output while preprocessing files.
@@ -101,7 +105,8 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			_, originFilename := filepath.Split(path)
 			_, targetFilename := filepath.Split(target)
 			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
-				c: t.FrontMatter,
+				localLinksStyle: c.LocalLinksStyle,
+				c:               t.FrontMatter,
 				origin: FrontMatterOrigin{
 					Filename:    originFilename,
 					FirstHeader: firstHeader,
@@ -213,12 +218,6 @@ type FrontMatterTarget struct {
 }
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
-	if f.localLinksStyle == Hugo {
-		if _, ok := frontMatter["slug"]; !ok {
-			frontMatter["slug"] = "{{ .Target.FileName }}"
-		}
-	}
-
 	b := bytes.Buffer{}
 	if err := f.c._template.Execute(&b, struct {
 		Origin      FrontMatterOrigin
@@ -236,6 +235,13 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 	if err := yaml.Unmarshal(b.Bytes(), m); err != nil {
 		return nil, errors.Wrapf(err, "generated template for %v is not a valid yaml", ctx.Filepath)
 	}
+
+	if f.localLinksStyle == Hugo {
+		if _, ok := m["slug"]; !ok {
+			m["slug"] = f.target.FileName
+		}
+	}
+
 	return mdformatter.FormatFrontMatter(m)
 }
 
