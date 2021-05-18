@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -55,96 +56,124 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 
 	}
 
-	var (
-		linkTransformer = &relLinkTransformer{
+	tr := &transformer{
+		ctx:    ctx,
+		c:      c,
+		logger: logger,
+
+		linkTransformer: &relLinkTransformer{
 			localLinksStyle:              c.LocalLinksStyle,
 			outputDir:                    c.OutputDir,
 			newAbsRelPathByOldAbsRelPath: map[string]string{},
-		}
-		files []string
-	)
+		},
+	}
 
-	// Move markdown files, preserving dir structure to output while preprocessing files.
-	if err := filepath.Walk(c.InputDir, func(path string, info os.FileInfo, err error) error {
+	for _, extra := range c.ExtraInputGlobs {
+		matches, err := filepath.Glob(extra)
 		if err != nil {
 			return err
 		}
-		if info.IsDir() || path == c.InputDir {
-			return nil
-		}
 
-		// absRelPath is an absolute path, but relatively to input dir (has `/` upfront).
-		absRelPath := strings.TrimPrefix(path, c.InputDir)
-
-		if filepath.Ext(path) != ".md" {
-			out := c.OutputStaticDir
-			if out == "" {
-				out = c.OutputDir
-			}
-			level.Debug(logger).Log("msg", "copying static file", "in", "target", filepath.Join(out, absRelPath))
-			return copyFiles(path, filepath.Join(out, absRelPath))
-		}
-
-		// Copy while preserving structure and tolerating custom mapping.
-		target := filepath.Join(c.OutputDir, absRelPath)
-		t, ok := firstMatch(absRelPath, c.Transformations)
-		if !ok {
-			files = append(files, target)
-			level.Debug(logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
-			return copyFiles(path, target)
-		}
-
-		if t.Skip {
-			return nil
-		}
-
-		defer func() {
-			files = append(files, target)
-		}()
-
-		var opts []mdformatter.Option
-		newAbsRelPath := newTargetAbsRelPath(absRelPath, t)
-		if newAbsRelPath != absRelPath {
-			linkTransformer.newAbsRelPathByOldAbsRelPath[absRelPath] = newAbsRelPath
-		}
-
-		target = filepath.Join(c.OutputDir, newAbsRelPath)
-		level.Debug(logger).Log("msg", "copying with transformation", "in", path, "absRelPath", absRelPath, "target", target)
-		if err := copyFiles(path, target); err != nil {
-			return err
-		}
-
-		if t.FrontMatter != nil {
-			firstHeader, rest, err := popFirstHeader(path)
-			if err != nil {
-				return errors.Wrap(err, "read first header")
-			}
-
-			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
+		for _, m := range matches {
+			info, err := os.Stat(m)
+			if err := tr.transformFile(m, info, err); err != nil {
 				return err
 			}
-			_, originFilename := filepath.Split(path)
-			_, targetFilename := filepath.Split(target)
-			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
-				localLinksStyle: c.LocalLinksStyle,
-				c:               t.FrontMatter,
-				origin: FrontMatterOrigin{
-					Filename:    originFilename,
-					FirstHeader: firstHeader,
-					LastMod:     info.ModTime().String(),
-				},
-				target: FrontMatterTarget{
-					FileName: targetFilename,
-				},
-			}))
 		}
-		return mdformatter.Format(ctx, logger, []string{target}, opts...)
-	}); err != nil {
+	}
+
+	// Move markdown files, preserving dir structure to output while preprocessing files.
+	if err := filepath.Walk(c.InputDir, tr.transformFile); err != nil {
 		return errors.Wrap(err, "walk")
 	}
 
 	// Once we did all the changes, change links.
-	return mdformatter.Format(ctx, logger, files, mdformatter.WithLinkTransformer(linkTransformer))
+	return mdformatter.Format(ctx, logger, tr.filesToLinkAdjust, mdformatter.WithLinkTransformer(tr.linkTransformer))
+}
+
+type transformer struct {
+	ctx    context.Context
+	c      Config
+	logger log.Logger
+
+	filesToLinkAdjust []string
+	linkTransformer   *relLinkTransformer
+}
+
+func (t *transformer) transformFile(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
+	if info.IsDir() || path == t.c.InputDir {
+		return nil
+	}
+
+	// absRelPath is an absolute path, but relatively to input dir (has `/` upfront).
+	absRelPath, err := filepath.Rel(t.c.InputDir, path)
+	if err != nil {
+		return errors.Wrap(err, "rel path to input dir")
+	}
+	absRelPath = "/" + absRelPath
+
+	if filepath.Ext(path) != ".md" {
+		out := t.c.OutputStaticDir
+		if out == "" {
+			out = t.c.OutputDir
+		}
+		level.Debug(t.logger).Log("msg", "copying static file", "in", path, "target", filepath.Join(out, absRelPath))
+		return copyFiles(path, filepath.Join(out, absRelPath))
+	}
+
+	// Copy while preserving structure and tolerating custom mapping.
+	target := filepath.Join(t.c.OutputDir, absRelPath)
+	tr, ok := firstMatch(absRelPath, t.c.Transformations)
+	if !ok {
+		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
+		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
+		return copyFiles(path, target)
+	}
+
+	defer func() {
+		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
+	}()
+
+	var opts []mdformatter.Option
+	newAbsRelPath := newTargetAbsRelPath(absRelPath, tr)
+	if newAbsRelPath != absRelPath {
+		t.linkTransformer.newAbsRelPathByOldAbsRelPath[absRelPath] = newAbsRelPath
+	}
+
+	target = filepath.Join(t.c.OutputDir, newAbsRelPath)
+	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "absRelPath", absRelPath, "target", target)
+	if err := copyFiles(path, target); err != nil {
+		return err
+	}
+
+	if tr.FrontMatter != nil {
+		firstHeader, rest, err := popFirstHeader(path)
+		if err != nil {
+			return errors.Wrap(err, "read first header")
+		}
+
+		if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
+			return err
+		}
+		_, originFilename := filepath.Split(path)
+		_, targetFilename := filepath.Split(target)
+		opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
+			localLinksStyle: t.c.LocalLinksStyle,
+			c:               tr.FrontMatter,
+			origin: FrontMatterOrigin{
+				Filename:    originFilename,
+				FirstHeader: firstHeader,
+				LastMod:     info.ModTime().String(),
+			},
+			target: FrontMatterTarget{
+				FileName: targetFilename,
+			},
+		}))
+	}
+	return mdformatter.Format(t.ctx, t.logger, []string{target}, opts...)
 }
 
 type relLinkTransformer struct {
@@ -160,6 +189,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	if strings.Contains(dest, "://") || filepath.IsAbs(dest) || strings.HasPrefix(string(destination), "#") {
 		return destination, nil
 	}
+	fmt.Println(ctx.Filepath)
 	// TODO(bwplotka): Check if links are outside?
 	currentAbsRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
 	if filepath.Join(currentAbsRelPath, dest) == ctx.Filepath {

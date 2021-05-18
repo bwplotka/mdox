@@ -29,10 +29,19 @@ const (
 )
 
 type Config struct {
-	Version         int
-	InputDir        string `yaml:"inputDir"`
-	OutputDir       string `yaml:"outputDir"`
+	Version int
+
+	// InputDir is a relative path that assumes input directory for markdown files and assets.
+	InputDir string `yaml:"inputDir"`
+	// OutputDir is a relative output directory that we expect all files to land in. Typically that can be `content` dir
+	// which hugo uses as an input.
+	OutputDir string `yaml:"outputDir"`
+	// OutputStaticDir is relative output directory for all non markdown files.
 	OutputStaticDir string `yaml:"outputStaticDir"`
+
+	// ExtraInputGlobs allows to bring files from outside of input dir.
+	// NOTE: No one can link to this file from input dir.
+	ExtraInputGlobs []string `yaml:"extraInputGlobs"`
 
 	// Transformations to apply for any file with .md extension.
 	Transformations []*TransformationConfig
@@ -50,9 +59,6 @@ type TransformationConfig struct {
 	// Glob matches files using https://github.com/gobwas/glob.
 	// After first match, file is no longer matching other elements.
 	Glob string
-
-	// Skip skips moving matched files.
-	Skip bool
 
 	// Path is an optional different path for the file to be moved.
 	// NOTE: All relative links will be moved accordingly.

@@ -2,12 +2,14 @@ version: 1
 
 inputDir: "testdata/testproj"
 outputDir: "testdata/tmp/2"
+extraInputGlobs:
+  - "../../README.md"
 
 gitIgnored: true
 localLinksStyle: hugo
 
 transformations:
-  - glob: "/README.md"
+  - glob: "/../../../../README.md"
     path: _index.md
     frontMatter:
       template: |
