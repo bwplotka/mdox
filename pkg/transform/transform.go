@@ -179,7 +179,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	} else if r.localLinksStyle == Hugo {
 		// Because all links are normally files, in Hugo those are literally URL paths (kind of "dirs").
 		// This is why we need to add ../ to them.
-		newDest = filepath.Join("..", newDest)
+		newDest = filepath.Join("..", newDest) + "/"
 
 		// All slugs and paths are converted to lower case on hugo too, so do this too links.
 		newDest = strings.ToLower(newDest)
