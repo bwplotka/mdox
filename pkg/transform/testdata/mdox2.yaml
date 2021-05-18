@@ -4,6 +4,7 @@ inputDir: "testdata/testproj"
 outputDir: "testdata/tmp/2"
 
 gitIgnored: true
+localLinksStyle: hugo
 
 transformations:
   - glob: "/README.md"
@@ -21,6 +22,7 @@ transformations:
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
+        slug: "{{ .Target.FileName }}"
 
   - glob: "/Team/doc.md"
     path: inner/doc.md

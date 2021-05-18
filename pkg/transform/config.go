@@ -16,6 +16,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type LinksStyle string
+
+const (
+	None LinksStyle = ""
+
+	// Hugo make sure mdox converts the links to work on Hugo-like website so:
+	// * Adds `slug: {{ FileName }}` to make sure filename extension is part of path, if slug is not added.
+	// * Local links are lower cased (hugo does that by default).
+	// * All links are expected to be paths e.g ../ is added to all local links.
+	Hugo LinksStyle = "hugo"
+)
+
 type Config struct {
 	Version   int
 	InputDir  string `yaml:"inputDir"`
@@ -25,6 +37,9 @@ type Config struct {
 
 	// GitIgnored specifies if output dir should be git ignored or not.
 	GitIgnored bool `yaml:"gitIgnored"`
+
+	// LocalLinksStyle sets linking style to be applied.
+	LocalLinksStyle LinksStyle `yaml:"localLinksStyle"`
 }
 
 type TransformationConfig struct {

@@ -122,6 +122,8 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 }
 
 type relLinkTransformer struct {
+	localLinksStyle LinksStyle
+
 	outputDir                    string
 	newAbsRelPathByOldAbsRelPath map[string]string
 }
@@ -174,10 +176,13 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 
 	if newDest == "." {
 		newDest = ""
-	} else {
+	} else if r.localLinksStyle == Hugo {
 		// Because all links are normally files, in Hugo those are literally URL paths (kind of "dirs").
 		// This is why we need to add ../ to them.
 		newDest = filepath.Join("..", newDest)
+
+		// All slugs and paths are converted to lower case on hugo too, so do this too links.
+		newDest = strings.ToLower(newDest)
 	}
 
 	if len(split) > 1 {
@@ -189,7 +194,8 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 type frontMatterTransformer struct {
-	c *FrontMatterConfig
+	localLinksStyle LinksStyle
+	c               *FrontMatterConfig
 
 	// Vars.
 	origin FrontMatterOrigin
@@ -207,6 +213,12 @@ type FrontMatterTarget struct {
 }
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
+	if f.localLinksStyle == Hugo {
+		if _, ok := frontMatter["slug"]; !ok {
+			frontMatter["slug"] = "{{ .Target.FileName }}"
+		}
+	}
+
 	b := bytes.Buffer{}
 	if err := f.c._template.Execute(&b, struct {
 		Origin      FrontMatterOrigin

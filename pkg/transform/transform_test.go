@@ -19,7 +19,7 @@ func TestTransform(t *testing.T) {
 		tmpDir   = "testdata/tmp"
 		testData = "testdata"
 	)
-	//defer func() { _ = os.RemoveAll(tmpDir) }()
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logger := log.NewLogfmtLogger(os.Stdout)
 
