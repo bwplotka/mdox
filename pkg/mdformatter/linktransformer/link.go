@@ -203,11 +203,11 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	merr := merrors.New()
 	base, err := os.Getwd()
 	if err != nil {
-		merr.Add(errors.Wrapf(err, "could not resolve working dir"))
+		return errors.Wrap(err, "resolve working dir")
 	}
 	path, err := filepath.Rel(base, ctx.Filepath)
 	if err != nil {
-		merr.Add(errors.Wrapf(err, "could not find relative path"))
+		return errors.Wrap(err, "find relative path")
 	}
 
 	for _, k := range keys {
