@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -49,7 +48,7 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		}
 
 		if c.GitIgnored {
-			if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*.*"), os.ModePerm); err != nil {
+			if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*"), os.ModePerm); err != nil {
 				return err
 			}
 		}
@@ -189,7 +188,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	if strings.Contains(dest, "://") || filepath.IsAbs(dest) || strings.HasPrefix(string(destination), "#") {
 		return destination, nil
 	}
-	fmt.Println(ctx.Filepath)
+
 	// TODO(bwplotka): Check if links are outside?
 	currentAbsRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
 	if filepath.Join(currentAbsRelPath, dest) == ctx.Filepath {
@@ -372,6 +371,9 @@ func popFirstHeader(path string) (_ string, rest []byte, err error) {
 
 			return strings.TrimPrefix(text, "# "), rest, scanner.Err()
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", nil, err
 	}
 	return "", nil, errors.New("No header found")
 }
