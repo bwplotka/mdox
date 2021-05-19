@@ -13,7 +13,7 @@ Allow projects to have self-updating up-to-date documentation available in both 
 ## Features
 
 * Enhanced and consistent formatting for markdown files in [GFM](https://github.github.com/gfm/) format, focused on readability.
-* Auto generation of code block content based on `mdoc-exec` directives (see [#code-generation](#code-generation)). Useful for:
+* Auto generation of code block content based on `mdox-exec` directives (see [#code-generation](#code-generation)). Useful for:
   * Generating help output from CLI --help
   * Generating example YAML from Go configuration struct (+comments)
 * Robust and fast relative and remote link checking.
