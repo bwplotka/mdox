@@ -183,6 +183,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check invalid local links", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
+		filePath := "/repo/docs/test/invalid-local-links.md"
+		wdir, err := os.Getwd()
+		testutil.Ok(t, err)
+		relDirPath, err := filepath.Rel(wdir, tmpDir)
+		testutil.Ok(t, err)
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
 
 [1](.) [2](#not-yolo) [3](../test2/invalid-local-links.md) [4](../test/invalid-local-links.md#not-yolo) [5](../test/doc.md)
@@ -196,17 +201,23 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, fmt.Sprintf("%v/repo/docs/test/invalid-local-links.md: 4 errors: "+
-			"link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
-			"link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
-			"link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
-			"link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
-			tmpDir, tmpDir, tmpDir, tmpDir, tmpDir), err.Error())
+
+		testutil.Equals(t, fmt.Sprintf("%v: 4 errors: "+
+			"%v: link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
+			"%v: link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
+			"%v: link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
+			"%v: link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
+			tmpDir+filePath, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir), err.Error())
 	})
 
 	t.Run("check 404 link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists\n"), os.ModePerm))
+		filePath := "/repo/docs/test/invalid-link.md"
+		wdir, err := os.Getwd()
+		testutil.Ok(t, err)
+		relDirPath, err := filepath.Rel(wdir, tmpDir)
+		testutil.Ok(t, err)
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
@@ -216,7 +227,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, tmpDir+"/repo/docs/test/invalid-link.md: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", err.Error())
+		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
 	})
 
 	t.Run("check 404 link, ignored", func(t *testing.T) {

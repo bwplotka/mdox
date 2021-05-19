@@ -201,14 +201,23 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	})
 
 	merr := merrors.New()
+	base, err := os.Getwd()
+	if err != nil {
+		return errors.Wrap(err, "resolve working dir")
+	}
+	path, err := filepath.Rel(base, ctx.Filepath)
+	if err != nil {
+		return errors.Wrap(err, "find relative path")
+	}
+
 	for _, k := range keys {
 		f := v.destFutures[k]
 		if err := f.resultFn(); err != nil {
 			if f.cases == 1 {
-				merr.Add(err)
+				merr.Add(errors.Wrapf(err, "%v", path))
 				continue
 			}
-			merr.Add(errors.Wrapf(err, "(%v occurrences)", f.cases))
+			merr.Add(errors.Wrapf(err, "%v (%v occurrences)", path, f.cases))
 		}
 	}
 	return merr.Err()
