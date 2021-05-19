@@ -6,12 +6,10 @@ package mdformatter
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"sort"
-	"strconv"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
@@ -23,6 +21,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"gopkg.in/yaml.v3"
 )
 
 type SourceContext struct {
@@ -71,7 +70,7 @@ func WithLinkTransformer(l LinkTransformer) Option {
 	}
 }
 
-// WithMetaBlockTransformer allows you to override the default CodeBlockTransformer.
+// WithCodeBlockTransformer allows you to override the default CodeBlockTransformer.
 func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	return func(m *Formatter) {
 		m.cb = cb
@@ -81,7 +80,7 @@ func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 func New(ctx context.Context, opts ...Option) *Formatter {
 	f := &Formatter{
 		ctx: ctx,
-		fm:  FormatFrontMatter{},
+		fm:  FormatFrontMatterTransformer{},
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -97,46 +96,73 @@ func (RemoveFrontMatter) TransformFrontMatter(_ SourceContext, _ map[string]inte
 
 func (RemoveFrontMatter) Close() error { return nil }
 
-type FormatFrontMatter struct{}
+type FormatFrontMatterTransformer struct{}
 
-func (FormatFrontMatter) TransformFrontMatter(_ SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
-	if len(frontMatter) == 0 {
+func (FormatFrontMatterTransformer) TransformFrontMatter(_ SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
+	return FormatFrontMatter(frontMatter)
+}
+
+func FormatFrontMatter(m map[string]interface{}) ([]byte, error) {
+	if len(m) == 0 {
 		return nil, nil
 	}
 
-	keys := make([]string, 0, len(frontMatter))
-	for k := range frontMatter {
+	keys := make([]string, 0, len(m))
+	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 
-	b := bytes.NewBuffer([]byte("---"))
-	for _, k := range keys {
-		// Check if frontMatter[k] is a map.
-		frontMatterMap, isMap := frontMatter[k].(map[string]interface{})
-		if isMap {
-			// Loop through all nested keys.
-			_, _ = fmt.Fprintf(b, "\n%v:", k)
-			for key, val := range frontMatterMap {
-				if v, ok := val.(string); ok {
-					_, _ = fmt.Fprintf(b, "\n  %v: %v", key, strconv.Quote(v))
-					continue
-				}
-				_, _ = fmt.Fprintf(b, "\n  %v: %v", key, val)
-			}
-			continue
-		}
-		if f, ok := frontMatter[k].(string); ok {
-			_, _ = fmt.Fprintf(b, "\n%v: %v", k, strconv.Quote(f))
-			continue
-		}
-		_, _ = fmt.Fprintf(b, "\n%v: %v", k, frontMatter[k])
+	f := sortedFrontMatter{
+		m:    m,
+		keys: keys,
 	}
-	_, _ = b.Write([]byte("\n---\n\n"))
+
+	b := bytes.NewBuffer([]byte("---\n"))
+	o, err := yaml.Marshal(f)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshall front matter")
+	}
+	_, _ = b.Write(o)
+	_, _ = b.Write([]byte("---\n\n"))
 	return b.Bytes(), nil
 }
 
-func (FormatFrontMatter) Close(SourceContext) error { return nil }
+var _ yaml.Marshaler = sortedFrontMatter{}
+
+type sortedFrontMatter struct {
+	m    map[string]interface{}
+	keys []string
+}
+
+func (f sortedFrontMatter) MarshalYAML() (interface{}, error) {
+	n := &yaml.Node{
+		Kind: yaml.MappingNode,
+	}
+
+	for _, k := range f.keys {
+		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k})
+
+		b, err := yaml.Marshal(f.m[k])
+		if err != nil {
+			return nil, errors.Wrap(err, "map marshal")
+		}
+		v := &yaml.Node{}
+		if err := yaml.Unmarshal(b, v); err != nil {
+			return nil, err
+		}
+
+		// We expect a node of type document with single content containing other nodes.
+		if len(v.Content) != 1 {
+			return nil, errors.Errorf("unexpected node after unmarshalling interface: %#v", v)
+		}
+		// TODO(bwplotka): This creates weird indentation, fix it.
+		n.Content = append(n.Content, v.Content[0])
+	}
+	return n, nil
+}
+
+func (FormatFrontMatterTransformer) Close(SourceContext) error { return nil }
 
 type Diffs []gitdiff.Diff
 

@@ -1,0 +1,26 @@
+version: 1
+
+inputDir: "testdata/testproj"
+outputDir: "testdata/tmp/1"
+outputStaticDir: "testdata/tmp/1static"
+
+gitIgnored: true
+
+transformations:
+  - glob: "/README.md"
+    path: _index.md
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+        cascade:
+        - type: "docs"
+          _target:
+            path: "/**"
+
+  - glob: "**/README.md"
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+        lastmod: "{{ .Origin.LastMod }}"
+        slug: "{{ .Target.FileName }}"
