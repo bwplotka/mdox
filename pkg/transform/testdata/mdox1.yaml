@@ -7,7 +7,7 @@ outputStaticDir: "testdata/tmp/1static"
 gitIgnored: true
 
 transformations:
-  - glob: "/README.md"
+  - glob: "README.md"
     path: _index.md
     frontMatter:
       template: |

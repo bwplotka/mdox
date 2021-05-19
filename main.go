@@ -133,7 +133,6 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		if !*disableGenCodeBlocksDirectives {
 			opts = append(opts, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
 		}
-
 		if len(*files) == 0 {
 			return errors.New("no files to format")
 		}

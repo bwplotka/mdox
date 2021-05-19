@@ -3,14 +3,14 @@ version: 1
 inputDir: "testdata/testproj"
 outputDir: "testdata/tmp/2"
 extraInputGlobs:
-  - "../../README.md"
+  - "testdata/test.md"
 
 gitIgnored: true
 localLinksStyle: hugo
 
 transformations:
-  - glob: "/../../../../README.md"
-    path: _index.md
+  - glob: "../test.md"
+    path: /_index.md
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
@@ -20,13 +20,13 @@ transformations:
           _target:
             path: "/**"
 
-  - glob: "/doc.md"
+  - glob: "doc.md"
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
         slug: "{{ .Target.FileName }}"
 
-  - glob: "/Team/doc.md"
+  - glob: "Team/doc.md"
     path: inner/doc.md
     frontMatter:
       template: |
