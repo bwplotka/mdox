@@ -140,7 +140,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "", anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -157,7 +157,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "", anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -175,7 +175,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "", anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -198,7 +198,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "", anchorDir),
 		))
 		testutil.NotOk(t, err)
 
@@ -224,7 +224,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "", anchorDir),
 		))
 		testutil.NotOk(t, err)
 		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
@@ -239,7 +239,21 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`://bwplotka.dev`), anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`://bwplotka.dev`), "", anchorDir),
+		))
+		testutil.Ok(t, err)
+	})
+
+	t.Run("check github links, skipped", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "github-link.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://github.com/bwplotka/mdox/issues/23 https://github.com/bwplotka/mdox/pull/32 https://github.com/bwplotka/mdox/pull/27#pullrequestreview-659598194\n"), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, regexp.MustCompile(`^$`), "bwplotka/mdox", anchorDir),
 		))
 		testutil.Ok(t, err)
 	})

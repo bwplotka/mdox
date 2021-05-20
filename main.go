@@ -127,6 +127,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateExceptDomains := cmd.Flag("links.validate.without-address-regex", "If specified, all links will be validated, except those matching the given target address.").Default(`^$`).Regexp()
+	linksSkipGitHub := cmd.Flag("links.validate.without-github-links", "If specified, all links will be validated, except the GitHub links for PRs and issues of the given repo.").Default("").String()
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var opts []mdformatter.Option
@@ -151,7 +152,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 
 		var linkTr []mdformatter.LinkTransformer
 		if *linksValidateEnabled {
-			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir)
+			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, *linksSkipGitHub, anchorDir)
 			if err != nil {
 				return err
 			}
