@@ -53,6 +53,8 @@ See those components on this diagram:
 
 <img src="img/arch.jpg" class="img-fluid" alt="architecture overview" />
 
+![img](img/arch.jpg)
+
 ### [Sidecar](components/sidecar.md)
 
 Thanos integrates with existing Prometheus servers through a [Sidecar process](https://docs.microsoft.com/en-us/azure/architecture/patterns/sidecar#solution), which runs on the same machine or in the same pod as the Prometheus server.

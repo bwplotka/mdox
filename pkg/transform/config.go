@@ -31,12 +31,12 @@ const (
 type Config struct {
 	Version int
 
-	// InputDir is a relative path that assumes input directory for markdown files and assets.
+	// InputDir is a relative (to PWD) path that assumes input directory for markdown files and assets.
 	InputDir string `yaml:"inputDir"`
-	// OutputDir is a relative output directory that we expect all files to land in. Typically that can be `content` dir
+	// OutputDir is a relative (to PWD) output directory that we expect all files to land in. Typically that can be `content` dir
 	// which hugo uses as an input.
 	OutputDir string `yaml:"outputDir"`
-	// OutputStaticDir is relative output directory for all non markdown files.
+	// OutputStaticDir is relative (to PWD) output directory for all non markdown files.
 	OutputStaticDir string `yaml:"outputStaticDir"`
 
 	// ExtraInputGlobs allows to bring files from outside of input dir.
@@ -57,11 +57,18 @@ type TransformationConfig struct {
 	_glob glob.Glob
 
 	// Glob matches files using https://github.com/gobwas/glob.
+	// Glob is matched against the relative path of the file in the input directory in
+	// relation to the input directory. For example:
+	// InputDir: dir1, File found in dir1/a/b/c/file.md, the given glob will be matched
+	// against a/b/c/file.md.
 	// After first match, file is no longer matching other elements.
 	Glob string
 
 	// Path is an optional different path for the file to be moved.
-	// NOTE: All relative links will be moved accordingly.
+	// If not specified, file will be moved to the exact same position as in input directory.
+	// Use absolute path to point the absolute structure where `/` means output directory.
+	// If relative path is used, it will start in the directory the file is in the input directory.
+	// NOTE: All relative links will be moved accordingly inside such file.
 	Path string
 
 	// FrontMatter holds front matter transformations.

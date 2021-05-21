@@ -37,7 +37,7 @@
 
  Thanos bases itself on vanilla [Prometheus](https://prometheus.io/) (v2.2.1+). We plan to support *all* Prometheus version beyond this version.
 
-@@ -77,4 +75,4 @@
+@@ -79,4 +77,4 @@
 
  If you are not interested in backing up any data, the `--objstore.config-file` flag can simply be omitted.
 
@@ -55,7 +55,7 @@
 
  Let's extend the Sidecar in the previous section to connect to a Prometheus server, and expose the Store API.
 
-@@ -96,4 +94,2 @@
+@@ -98,4 +96,2 @@
      --grpc-address              0.0.0.0:19090              # GRPC endpoint for StoreAPI
  ```
 
@@ -71,7 +71,7 @@
 
  #### External Labels
 
-@@ -168,5 +164,3 @@
+@@ -170,5 +166,3 @@
 
  Go to the configured HTTP address, and you should now be able to query across all Prometheus instances and receive de-duplicated data.
 
@@ -90,7 +90,7 @@
 
  ```bash
  thanos query \
-@@ -189,4 +183,2 @@
+@@ -191,4 +185,2 @@
 
  Read more details [here](service-discovery.md).
 
@@ -106,7 +106,7 @@
 
  ```bash
  thanos store \
-@@ -207,1 +199,1 @@
+@@ -209,1 +201,1 @@
 
  The store gateway occupies small amounts of disk space for caching basic information about data in the object storage. This will rarely exceed more than a few gigabytes and is used to improve restart times. It is useful but not required to preserve it across restarts.
 
@@ -115,7 +115,7 @@
 
  ### [Compactor](components/compact.md)
 
-@@ -224,8 +216,4 @@
+@@ -226,8 +218,4 @@
 
  The compactor is not in the critical path of querying or data backup. It can either be run as a periodic batch job or be left running to always compact data as soon as possible. It is recommended to provide 100-300GB of local disk space for data processing.
 
@@ -140,7 +140,7 @@
  ```$
  usage: thanos rule [<flags>]
 
-@@ -412,1 +400,0 @@
+@@ -414,1 +402,0 @@
 
  The configuration format is the following:
 
@@ -148,7 +148,7 @@
  ```yaml
  alertmanagers:
  - http_config:
-@@ -438,1 +425,4 @@
+@@ -440,1 +427,4 @@
    timeout: 10s
    api_version: v1
  ```

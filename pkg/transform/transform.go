@@ -61,9 +61,11 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		logger: logger,
 
 		linkTransformer: &relLinkTransformer{
-			localLinksStyle:              c.LocalLinksStyle,
-			outputDir:                    c.OutputDir,
-			newAbsRelPathByOldAbsRelPath: map[string]string{},
+			localLinksStyle: c.LocalLinksStyle,
+			inputDir:        c.InputDir,
+			outputDir:       c.OutputDir,
+			oldRelPath:      map[string]string{},
+			newAbsRelPath:   map[string]string{},
 		},
 	}
 
@@ -107,28 +109,28 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		return nil
 	}
 
-	// absRelPath is an absolute path, but relatively to input dir (has `/` upfront).
-	absRelPath, err := filepath.Rel(t.c.InputDir, path)
+	// All relative paths are in relation to either input or output dirs.
+	relPath, err := filepath.Rel(t.c.InputDir, path)
 	if err != nil {
 		return errors.Wrap(err, "rel path to input dir")
 	}
-	absRelPath = "/" + absRelPath
 
 	if filepath.Ext(path) != ".md" {
 		out := t.c.OutputStaticDir
 		if out == "" {
 			out = t.c.OutputDir
 		}
-		level.Debug(t.logger).Log("msg", "copying static file", "in", path, "target", filepath.Join(out, absRelPath))
-		return copyFiles(path, filepath.Join(out, absRelPath))
+		level.Debug(t.logger).Log("msg", "copying static file", "in", path, "target", filepath.Join(out, relPath))
+		return copyFiles(path, filepath.Join(out, relPath))
 	}
 
 	// Copy while preserving structure and tolerating custom mapping.
-	target := filepath.Join(t.c.OutputDir, absRelPath)
-	tr, ok := firstMatch(absRelPath, t.c.Transformations)
+	target := filepath.Join(t.c.OutputDir, relPath)
+
+	tr, ok := firstMatch(relPath, t.c.Transformations)
 	if !ok {
 		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
-		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "absRelPath", absRelPath, "target", target)
+		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "absRelPath", relPath, "target", target)
 		return copyFiles(path, target)
 	}
 
@@ -137,13 +139,14 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 	}()
 
 	var opts []mdformatter.Option
-	newAbsRelPath := newTargetAbsRelPath(absRelPath, tr)
-	if newAbsRelPath != absRelPath {
-		t.linkTransformer.newAbsRelPathByOldAbsRelPath[absRelPath] = newAbsRelPath
+	newAbsRelPath := newTargetAbsRelPath(relPath, tr)
+	if newAbsRelPath != "/"+relPath {
+		t.linkTransformer.oldRelPath[newAbsRelPath] = relPath
+		t.linkTransformer.newAbsRelPath[relPath] = newAbsRelPath
 	}
 
 	target = filepath.Join(t.c.OutputDir, newAbsRelPath)
-	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "absRelPath", absRelPath, "target", target)
+	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "absRelPath", relPath, "target", target)
 	if err := copyFiles(path, target); err != nil {
 		return err
 	}
@@ -178,18 +181,21 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 type relLinkTransformer struct {
 	localLinksStyle LinksStyle
 
-	outputDir                    string
-	newAbsRelPathByOldAbsRelPath map[string]string
+	inputDir      string
+	outputDir     string
+	oldRelPath    map[string]string
+	newAbsRelPath map[string]string
 }
 
 func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) ([]byte, error) {
 	split := strings.Split(string(destination), "#")
 	dest := split[0]
+
 	if strings.Contains(dest, "://") || filepath.IsAbs(dest) || strings.HasPrefix(string(destination), "#") {
 		return destination, nil
 	}
 
-	// TODO(bwplotka): Check if links are outside?
+	// absRelPath is an absolute path, but relatively to output dir (has `/` upfront).
 	currentAbsRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
 	if filepath.Join(currentAbsRelPath, dest) == ctx.Filepath {
 		// Pointing to self.
@@ -202,36 +208,56 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 
 	currentAbsRelDir := filepath.Dir(currentAbsRelPath)
 
-	// Do we changed?
-	change := ""
-	for n, old := range r.newAbsRelPathByOldAbsRelPath {
-		if old != currentAbsRelPath {
-			continue
-		}
-		c, err := filepath.Rel(filepath.Dir(old), filepath.Dir(n))
+	// Do we changed. Try to navigate from current, transformed path into what was before.
+	oldRelDir := currentAbsRelDir
+	if old, ok := r.oldRelPath[currentAbsRelPath]; ok {
+		// Remove absoluteness for proper relation check.
+		currRelPath := strings.TrimPrefix(currentAbsRelPath, "/")
+		change, err := filepath.Rel(filepath.Dir(old), filepath.Dir(currRelPath))
 		if err != nil {
-			return nil, err
+			// Possible error: old path is before currRelPath. This can happen if the input file was grabbed from outside.
+			// Try otherwise.
+			change, err = filepath.Rel(filepath.Dir(currRelPath), filepath.Join(filepath.Dir(old)))
+			if err != nil {
+				return nil, err
+			}
+			oldRelDir = filepath.Join(change, currentAbsRelDir)
+		} else {
+			oldRelDir = filepath.Join(currentAbsRelDir, change)
 		}
-		change = c
-		break
 	}
+	oldRelDestination := filepath.Join(oldRelDir, dest)
 
-	adjustedAbsRelDir := filepath.Join(currentAbsRelDir, change)
-	adjustedAbsRelDest := filepath.Join(adjustedAbsRelDir, dest)
-
-	// Does the link points to something that changed?
-	if absNewRelPath, ok := r.newAbsRelPathByOldAbsRelPath[adjustedAbsRelDest]; ok {
-		adjustedAbsRelDest = absNewRelPath
-	}
-
-	newDest, err := filepath.Rel(currentAbsRelDir, adjustedAbsRelDest)
+	// Evaluate this path to make sure we cover case when we go outside of our "absolute" root which is output dir.
+	absOldDest, err := filepath.Abs(filepath.Join(r.inputDir, oldRelDestination))
 	if err != nil {
 		return nil, err
 	}
 
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	oldRelDestination, err = filepath.Rel(filepath.Join(wd, r.inputDir), absOldDest)
+	if err != nil {
+		return nil, err
+	}
+
+	oldAbsDestination := "/" + oldRelDestination
+	// Does the link points to something that changed?
+	if absNewRelPath, ok := r.newAbsRelPath[oldRelDestination]; ok {
+		oldAbsDestination = absNewRelPath
+	}
+
+	newDest, err := filepath.Rel(currentAbsRelDir, oldAbsDestination)
+	if err != nil {
+		return nil, errors.Wrap(err, "relation between new and old file path")
+	}
+
 	if newDest == "." {
 		newDest = ""
-	} else if r.localLinksStyle == Hugo {
+	} else if r.localLinksStyle == Hugo && filepath.Ext(dest) == ".md" {
 		// Because all links are normally files, in Hugo those are literally URL paths (kind of "dirs").
 		// This is why we need to add ../ to them.
 		newDest = filepath.Join("..", newDest) + "/"
@@ -306,16 +332,16 @@ func firstMatch(absRelPath string, trs []*TransformationConfig) (*Transformation
 	return nil, false
 }
 
-func newTargetAbsRelPath(absRelPath string, tr *TransformationConfig) string {
+func newTargetAbsRelPath(relPath string, tr *TransformationConfig) string {
 	if tr.Path == "" {
-		return absRelPath
+		return "/" + relPath
 	}
 
 	if filepath.IsAbs(tr.Path) {
 		return tr.Path
 	}
 
-	return filepath.Join(filepath.Dir(absRelPath), tr.Path)
+	return "/" + filepath.Join(filepath.Dir(relPath), tr.Path)
 }
 
 func copyFiles(src, dst string) (err error) {

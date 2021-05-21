@@ -40,6 +40,7 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 	if err := ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		var err error
 		switch typedNode := n.(type) {
+		// TODO(bwplotka): Add support for links inside HTML.
 		case *ast.Link:
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
@@ -62,6 +63,14 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			repl := ast.NewString(dest)
 			repl.SetParent(n)
 			n.Parent().ReplaceChild(n.Parent(), n, repl)
+		case *ast.Image:
+			if !entering || t.link == nil {
+				return ast.WalkSkipChildren, nil
+			}
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
+			if err != nil {
+				return ast.WalkStop, err
+			}
 		case *ast.FencedCodeBlock:
 			if !entering || t.cb == nil || typedNode.Info == nil {
 				return ast.WalkSkipChildren, nil
