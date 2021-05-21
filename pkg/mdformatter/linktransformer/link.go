@@ -200,6 +200,9 @@ func getGitHubRegex(reponame string) (*regexp.Regexp, int, error) {
 		if err != nil {
 			return nil, math.MaxInt64, err
 		}
+		if respPull.StatusCode != 200 {
+			return nil, math.MaxInt64, errors.New("pulls API request failed. status code: " + strconv.Itoa(respPull.StatusCode))
+		}
 		defer respPull.Body.Close()
 		if err := json.NewDecoder(respPull.Body).Decode(&pullNum); err != nil {
 			return nil, math.MaxInt64, err
@@ -212,6 +215,9 @@ func getGitHubRegex(reponame string) (*regexp.Regexp, int, error) {
 		respIssue, err := http.Get(fmt.Sprintf(gitHubAPIURL, reponame, "issues"))
 		if err != nil {
 			return nil, math.MaxInt64, err
+		}
+		if respIssue.StatusCode != 200 {
+			return nil, math.MaxInt64, errors.New("issues API request failed. status code: " + strconv.Itoa(respIssue.StatusCode))
 		}
 		defer respIssue.Body.Close()
 		if err := json.NewDecoder(respIssue.Body).Decode(&issueNum); err != nil {
