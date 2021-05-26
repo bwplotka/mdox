@@ -1,8 +1,8 @@
 version: 1
 
 inputDir: "testdata/testproj"
-outputDir: "testdata/tmp/1"
-outputStaticDir: "testdata/tmp/1static"
+outputDir: "testdata/tmp/test1/1"
+outputStaticDir: "testdata/tmp/test1/1static"
 
 gitIgnored: true
 

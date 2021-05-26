@@ -65,11 +65,15 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			inputDir:        c.InputDir,
 			outputDir:       c.OutputDir,
 			oldRelPath:      map[string]string{},
-			newAbsRelPath:   map[string]string{},
+			newRelPath:      map[string]string{},
 		},
 	}
 
-	for _, extra := range c.ExtraInputGlobs {
+	for _, e := range c.ExtraInputGlobs {
+		extra, err := filepath.Abs(e)
+		if err != nil {
+			return err
+		}
 		matches, err := filepath.Glob(extra)
 		if err != nil {
 			return err
@@ -130,7 +134,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 	tr, ok := firstMatch(relPath, t.c.Transformations)
 	if !ok {
 		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
-		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "absRelPath", relPath, "target", target)
+		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "relPath", relPath, "target", target)
 		return copyFiles(path, target)
 	}
 
@@ -139,14 +143,14 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 	}()
 
 	var opts []mdformatter.Option
-	newAbsRelPath := newTargetAbsRelPath(relPath, tr)
-	if newAbsRelPath != "/"+relPath {
-		t.linkTransformer.oldRelPath[newAbsRelPath] = relPath
-		t.linkTransformer.newAbsRelPath[relPath] = newAbsRelPath
+	newRelPath := newTargetRelPath(relPath, tr)
+	if newRelPath != relPath {
+		t.linkTransformer.oldRelPath[newRelPath] = relPath
+		t.linkTransformer.newRelPath[relPath] = newRelPath
 	}
 
-	target = filepath.Join(t.c.OutputDir, newAbsRelPath)
-	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "absRelPath", relPath, "target", target)
+	target = filepath.Join(t.c.OutputDir, newRelPath)
+	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "relPath", relPath, "target", target)
 	if err := copyFiles(path, target); err != nil {
 		return err
 	}
@@ -179,25 +183,27 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 }
 
 type relLinkTransformer struct {
-	localLinksStyle LinksStyle
+	localLinksStyle LocalLinksStyle
 
-	inputDir      string
-	outputDir     string
-	oldRelPath    map[string]string
-	newAbsRelPath map[string]string
+	inputDir   string
+	outputDir  string
+	oldRelPath map[string]string
+	newRelPath map[string]string
 }
 
 func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) ([]byte, error) {
 	split := strings.Split(string(destination), "#")
-	dest := split[0]
-
-	if strings.Contains(dest, "://") || filepath.IsAbs(dest) || strings.HasPrefix(string(destination), "#") {
+	relDest := split[0]
+	if strings.Contains(relDest, "://") || filepath.IsAbs(relDest) || strings.HasPrefix(string(destination), "#") {
 		return destination, nil
 	}
 
-	// absRelPath is an absolute path, but relatively to output dir (has `/` upfront).
-	currentAbsRelPath := strings.TrimPrefix(ctx.Filepath, r.outputDir)
-	if filepath.Join(currentAbsRelPath, dest) == ctx.Filepath {
+	currRelPath, err := filepath.Rel(r.outputDir, ctx.Filepath)
+	if err != nil {
+		return nil, errors.Wrap(err, "link: rel filepath to output")
+	}
+
+	if filepath.Join(currRelPath, relDest) == ctx.Filepath {
 		// Pointing to self.
 		_, file := filepath.Split(ctx.Filepath)
 		if len(split) > 1 {
@@ -206,66 +212,40 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 		return []byte(file), nil
 	}
 
-	currentAbsRelDir := filepath.Dir(currentAbsRelPath)
-
-	// Do we changed. Try to navigate from current, transformed path into what was before.
-	oldRelDir := currentAbsRelDir
-	if old, ok := r.oldRelPath[currentAbsRelPath]; ok {
-		// Remove absoluteness for proper relation check.
-		currRelPath := strings.TrimPrefix(currentAbsRelPath, "/")
-		change, err := filepath.Rel(filepath.Dir(old), filepath.Dir(currRelPath))
+	// Check the situation of input file from the before conversion, what was the link targeting before conversion?
+	curRelDir := filepath.Dir(currRelPath)
+	oldRelDest := filepath.Join(curRelDir, relDest)
+	if oldRelPath, ok := r.oldRelPath[currRelPath]; ok {
+		oldRelDest, err = filepath.Rel(r.inputDir, filepath.Join(r.inputDir, filepath.Dir(oldRelPath), relDest))
 		if err != nil {
-			// Possible error: old path is before currRelPath. This can happen if the input file was grabbed from outside.
-			// Try otherwise.
-			change, err = filepath.Rel(filepath.Dir(currRelPath), filepath.Join(filepath.Dir(old)))
-			if err != nil {
-				return nil, err
-			}
-			oldRelDir = filepath.Join(change, currentAbsRelDir)
-		} else {
-			oldRelDir = filepath.Join(currentAbsRelDir, change)
+			return nil, errors.Wrap(err, "link: clean old dest path")
 		}
 	}
-	oldRelDestination := filepath.Join(oldRelDir, dest)
 
-	// Evaluate this path to make sure we cover case when we go outside of our "absolute" root which is output dir.
-	absOldDest, err := filepath.Abs(filepath.Join(r.inputDir, oldRelDestination))
-	if err != nil {
-		return nil, err
+	currDest := oldRelDest
+	if newRelPath, ok := r.newRelPath[oldRelDest]; ok {
+		currDest = newRelPath
 	}
 
-	wd, err := os.Getwd()
+	newDest, err := filepath.Rel(filepath.Join(r.outputDir, curRelDir), filepath.Join(r.outputDir, currDest))
 	if err != nil {
-		return nil, err
-	}
-
-	oldRelDestination, err = filepath.Rel(filepath.Join(wd, r.inputDir), absOldDest)
-	if err != nil {
-		return nil, err
-	}
-
-	oldAbsDestination := "/" + oldRelDestination
-	// Does the link points to something that changed?
-	if absNewRelPath, ok := r.newAbsRelPath[oldRelDestination]; ok {
-		oldAbsDestination = absNewRelPath
-	}
-
-	newDest, err := filepath.Rel(currentAbsRelDir, oldAbsDestination)
-	if err != nil {
-		return nil, errors.Wrap(err, "relation between new and old file path")
+		return nil, errors.Wrap(err, "link: rel new dest dir with curr file dir")
 	}
 
 	if newDest == "." {
 		newDest = ""
-	} else if r.localLinksStyle == Hugo && filepath.Ext(dest) == ".md" {
-		// Because all links are normally files, in Hugo those are literally URL paths (kind of "dirs").
-		// This is why we need to add ../ to them.
-		newDest = filepath.Join("..", newDest) + "/"
+	} else if h := r.localLinksStyle.Hugo; h != nil {
+		if !strings.HasSuffix(ctx.Filepath, h.IndexFileName) {
+			// All links are normally just files, in Hugo those are literally URL paths (kind of "dirs").
+			// This is why we need to add ../ to them.
+			newDest = filepath.Join("..", newDest)
+		}
 
-		// All slugs and paths are converted to lower case on hugo too, so do this too links.
-		newDest = strings.ToLower(newDest)
+		if filepath.Ext(newDest) == ".md" {
+			// All slugs and paths are converted to lower case on hugo.
+			newDest = strings.ToLower(newDest) + "/"
+		}
 	}
-
 	if len(split) > 1 {
 		return []byte(newDest + "#" + split[1]), nil
 	}
@@ -275,7 +255,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 type frontMatterTransformer struct {
-	localLinksStyle LinksStyle
+	localLinksStyle LocalLinksStyle
 	c               *FrontMatterConfig
 
 	// Vars.
@@ -312,7 +292,7 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 		return nil, errors.Wrapf(err, "generated template for %v is not a valid yaml", ctx.Filepath)
 	}
 
-	if f.localLinksStyle == Hugo {
+	if f.localLinksStyle.Hugo != nil && f.target.FileName != f.localLinksStyle.Hugo.IndexFileName {
 		if _, ok := m["slug"]; !ok {
 			m["slug"] = f.target.FileName
 		}
@@ -332,16 +312,16 @@ func firstMatch(absRelPath string, trs []*TransformationConfig) (*Transformation
 	return nil, false
 }
 
-func newTargetAbsRelPath(relPath string, tr *TransformationConfig) string {
+func newTargetRelPath(relPath string, tr *TransformationConfig) string {
 	if tr.Path == "" {
-		return "/" + relPath
+		return relPath
 	}
 
 	if filepath.IsAbs(tr.Path) {
-		return tr.Path
+		return strings.TrimPrefix(tr.Path, "/")
 	}
 
-	return "/" + filepath.Join(filepath.Dir(relPath), tr.Path)
+	return filepath.Join(filepath.Dir(relPath), tr.Path)
 }
 
 func copyFiles(src, dst string) (err error) {

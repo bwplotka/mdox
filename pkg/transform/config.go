@@ -16,17 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type LinksStyle string
-
-const (
-	None LinksStyle = ""
-
+type LocalLinksStyle struct {
 	// Hugo make sure mdox converts the links to work on Hugo-like website so:
 	// * Adds `slug: {{ FileName }}` to make sure filename extension is part of path, if slug is not added.
 	// * Local links are lower cased (hugo does that by default).
-	// * All links are expected to be paths e.g ../ is added to all local links.
-	Hugo LinksStyle = "hugo"
-)
+	// * All links are expected to be paths e.g ../ is added if they target local, non directory links.
+	Hugo *HugoLocalLinksStyle
+}
+type HugoLocalLinksStyle struct {
+	// e.g for google/docsy it is "_index.md"
+	IndexFileName string `yaml:"indexFileName"`
+}
 
 type Config struct {
 	Version int
@@ -49,8 +49,8 @@ type Config struct {
 	// GitIgnored specifies if output dir should be git ignored or not.
 	GitIgnored bool `yaml:"gitIgnored"`
 
-	// LocalLinksStyle sets linking style to be applied.
-	LocalLinksStyle LinksStyle `yaml:"localLinksStyle"`
+	// LocalLinksStyle sets linking style to be applied. If empty, we assume default style.
+	LocalLinksStyle LocalLinksStyle `yaml:"localLinksStyle"`
 }
 
 type TransformationConfig struct {
@@ -105,7 +105,7 @@ func ParseConfig(c []byte) (Config, error) {
 	}
 
 	if cfg.InputDir == "" {
-		return Config{}, errors.New("contentDir field is required")
+		return Config{}, errors.New("inputDir field is required")
 	}
 
 	d, err := os.Stat(cfg.InputDir)
@@ -113,14 +113,30 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, err
 	}
 	if !d.IsDir() {
-		return Config{}, errors.New("contentDir field is not pointing directory")
+		return Config{}, errors.New("inputDir field is not pointing to a directory")
+	}
+	cfg.InputDir, err = filepath.Abs(cfg.InputDir)
+	if err != nil {
+		return Config{}, err
 	}
 	cfg.InputDir = strings.TrimSuffix(cfg.InputDir, "/")
 
 	if cfg.OutputDir == "" {
 		return Config{}, errors.New("outputDir field is required")
 	}
+	cfg.OutputDir, err = filepath.Abs(cfg.OutputDir)
+	if err != nil {
+		return Config{}, err
+	}
 	cfg.OutputDir = strings.TrimSuffix(cfg.OutputDir, "/")
+
+	if cfg.OutputStaticDir != "" {
+		cfg.OutputStaticDir, err = filepath.Abs(cfg.OutputStaticDir)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.OutputStaticDir = strings.TrimSuffix(cfg.OutputStaticDir, "/")
+	}
 
 	for _, f := range cfg.Transformations {
 		f._glob, err = glob.Compile(f.Glob, '/')
