@@ -1,7 +1,7 @@
 ---
 title: Proposals
 slug: README.md
-lastmod: 2021-05-21 20:37:18.809374909 +0200 CEST
+lastmod: 'TODO: Allow testing last mod .Origin.LastMod'
 ---
 
 [RelLink](../_index.md)

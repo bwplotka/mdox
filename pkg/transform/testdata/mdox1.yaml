@@ -22,5 +22,5 @@ transformations:
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
-        lastmod: "{{ .Origin.LastMod }}"
+        lastmod: "TODO: Allow testing last mod .Origin.LastMod"
         slug: "{{ .Target.FileName }}"
