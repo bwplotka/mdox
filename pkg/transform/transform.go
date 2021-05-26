@@ -21,6 +21,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func isMDFile(path string) bool {
+	return filepath.Ext(path) == ".md"
+}
+
+func prepOutputDir(d string, gitIgnored bool) error {
+	_, err := os.Stat(d)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if os.IsExist(err) {
+		if err := os.RemoveAll(d); err != nil {
+			return err
+		}
+	}
+	if err := os.MkdirAll(d, os.ModePerm); err != nil {
+		return err
+	}
+
+	if gitIgnored {
+		if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*"), os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Dir transforms directory using given configuration file.
 func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 	c, err := parseConfigFile(configFile)
@@ -28,31 +55,8 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 		return err
 	}
 
-	for _, d := range []string{c.OutputDir, c.OutputStaticDir} {
-		if d == "" {
-			continue
-		}
-
-		_, err = os.Stat(d)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-
-		if !os.IsNotExist(err) {
-			if err := os.RemoveAll(d); err != nil {
-				return err
-			}
-		}
-		if err := os.MkdirAll(d, os.ModePerm); err != nil {
-			return err
-		}
-
-		if c.GitIgnored {
-			if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*"), os.ModePerm); err != nil {
-				return err
-			}
-		}
-
+	if err := prepOutputDir(c.OutputDir, c.GitIgnored); err != nil {
+		return err
 	}
 
 	tr := &transformer{
@@ -79,15 +83,19 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 			return err
 		}
 
+		if len(matches) == 0 {
+			return errors.Errorf("no matches found for extraInputGlob %v", e)
+		}
+
 		for _, m := range matches {
-			info, err := os.Stat(m)
-			if err := tr.transformFile(m, info, err); err != nil {
-				return err
+			if err := filepath.Walk(m, tr.transformFile); err != nil {
+				return errors.Wrap(err, "walk, extra input")
 			}
 		}
 	}
 
-	// Move markdown files, preserving dir structure to output while preprocessing files.
+	// Move files, preserving dir structure to output while preprocessing files.
+	// For markdown files, adjust links too.
 	if err := filepath.Walk(c.InputDir, tr.transformFile); err != nil {
 		return errors.Wrap(err, "walk")
 	}
@@ -119,43 +127,50 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		return errors.Wrap(err, "rel path to input dir")
 	}
 
-	if filepath.Ext(path) != ".md" {
-		out := t.c.OutputStaticDir
-		if out == "" {
-			out = t.c.OutputDir
-		}
-		level.Debug(t.logger).Log("msg", "copying static file", "in", path, "target", filepath.Join(out, relPath))
-		return copyFiles(path, filepath.Join(out, relPath))
-	}
-
 	// Copy while preserving structure and tolerating custom mapping.
 	target := filepath.Join(t.c.OutputDir, relPath)
 
+	defer func() {
+		if isMDFile(target) {
+			t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
+		}
+	}()
+
 	tr, ok := firstMatch(relPath, t.c.Transformations)
 	if !ok {
-		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
 		level.Debug(t.logger).Log("msg", "copying without transformation", "in", path, "relPath", relPath, "target", target)
 		return copyFiles(path, target)
 	}
 
-	defer func() {
-		t.filesToLinkAdjust = append(t.filesToLinkAdjust, target)
-	}()
-
 	var opts []mdformatter.Option
-	newRelPath := newTargetRelPath(relPath, tr)
-	if newRelPath != relPath {
+	newRelPath, err := tr.targetRelPath(relPath)
+	if err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(newRelPath, "..") {
+		// Silly way of propagating git ignores where needed.
+		if err := prepOutputDir(filepath.Join(t.c.OutputDir, filepath.Dir(newRelPath)), t.c.GitIgnored); err != nil {
+			return err
+		}
+	}
+	target = filepath.Join(t.c.OutputDir, newRelPath)
+
+	if newRelPath != relPath && isMDFile(target) {
 		t.linkTransformer.oldRelPath[newRelPath] = relPath
 		t.linkTransformer.newRelPath[relPath] = newRelPath
 	}
 
-	target = filepath.Join(t.c.OutputDir, newRelPath)
 	level.Debug(t.logger).Log("msg", "copying with transformation", "in", path, "relPath", relPath, "target", target)
 	if err := copyFiles(path, target); err != nil {
 		return err
 	}
 
 	if tr.FrontMatter != nil {
+		if !isMDFile(target) {
+			return errors.Errorf("front matter option set on file that after transformation is non-markdown: %v", target)
+		}
+
 		firstHeader, rest, err := popFirstHeader(path)
 		if err != nil {
 			return errors.Wrap(err, "read first header")
@@ -179,6 +194,11 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 			},
 		}))
 	}
+
+	if !isMDFile(target) {
+		return nil
+	}
+
 	return mdformatter.Format(t.ctx, t.logger, []string{target}, opts...)
 }
 
@@ -241,7 +261,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 			newDest = filepath.Join("..", newDest)
 		}
 
-		if filepath.Ext(newDest) == ".md" {
+		if isMDFile(newDest) {
 			// All slugs and paths are converted to lower case on hugo.
 			newDest = strings.ToLower(newDest) + "/"
 		}
@@ -310,18 +330,6 @@ func firstMatch(absRelPath string, trs []*TransformationConfig) (*Transformation
 		}
 	}
 	return nil, false
-}
-
-func newTargetRelPath(relPath string, tr *TransformationConfig) string {
-	if tr.Path == "" {
-		return relPath
-	}
-
-	if filepath.IsAbs(tr.Path) {
-		return strings.TrimPrefix(tr.Path, "/")
-	}
-
-	return filepath.Join(filepath.Dir(relPath), tr.Path)
 }
 
 func copyFiles(src, dst string) (err error) {

@@ -36,14 +36,11 @@ type Config struct {
 	// OutputDir is a relative (to PWD) output directory that we expect all files to land in. Typically that can be `content` dir
 	// which hugo uses as an input.
 	OutputDir string `yaml:"outputDir"`
-	// OutputStaticDir is relative (to PWD) output directory for all non markdown files.
-	OutputStaticDir string `yaml:"outputStaticDir"`
 
 	// ExtraInputGlobs allows to bring files from outside of input dir.
-	// NOTE: No one can link to this file from input dir.
 	ExtraInputGlobs []string `yaml:"extraInputGlobs"`
 
-	// Transformations to apply for any file with .md extension.
+	// Transformations to apply for any file.
 	Transformations []*TransformationConfig
 
 	// GitIgnored specifies if output dir should be git ignored or not.
@@ -69,10 +66,45 @@ type TransformationConfig struct {
 	// Use absolute path to point the absolute structure where `/` means output directory.
 	// If relative path is used, it will start in the directory the file is in the input directory.
 	// NOTE: All relative links will be moved accordingly inside such file.
+	// TODO(bwplotka): Explain ** and * suffixes and ability to specify "invalid" paths like "/../".
 	Path string
 
 	// FrontMatter holds front matter transformations.
 	FrontMatter *FrontMatterConfig `yaml:"frontMatter"`
+}
+
+func (tr TransformationConfig) targetRelPath(relPath string) (_ string, err error) {
+	if tr.Path == "" {
+		return relPath, nil
+	}
+
+	if dir, file := filepath.Split(strings.TrimSuffix(tr.Glob, filepath.Ext(tr.Glob))); file == "**" {
+		relPath, err = filepath.Rel(dir, relPath)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	currDir, currFile := filepath.Split(relPath)
+	targetDir, targetSuffix := filepath.Split(strings.TrimPrefix(tr.Path, "/"))
+
+	if strings.HasSuffix(tr.Path, "/*") {
+		targetSuffix = currFile
+	} else if strings.HasSuffix(tr.Path, "/**") {
+		if !filepath.IsAbs(tr.Path) {
+			return "", errors.Errorf("path has to be absolute if suffix /** is used, got %v", tr.Path)
+		}
+
+		targetSuffix = relPath
+		targetDir = filepath.Dir(strings.TrimPrefix(tr.Path, "/"))
+
+	}
+
+	if !filepath.IsAbs(tr.Path) {
+		targetDir = filepath.Join(currDir, targetDir)
+	}
+
+	return filepath.Join(targetDir, targetSuffix), nil
 }
 
 type FrontMatterConfig struct {
@@ -129,14 +161,6 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, err
 	}
 	cfg.OutputDir = strings.TrimSuffix(cfg.OutputDir, "/")
-
-	if cfg.OutputStaticDir != "" {
-		cfg.OutputStaticDir, err = filepath.Abs(cfg.OutputStaticDir)
-		if err != nil {
-			return Config{}, err
-		}
-		cfg.OutputStaticDir = strings.TrimSuffix(cfg.OutputStaticDir, "/")
-	}
 
 	for _, f := range cfg.Transformations {
 		f._glob, err = glob.Compile(f.Glob, '/')

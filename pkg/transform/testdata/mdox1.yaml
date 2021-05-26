@@ -2,7 +2,6 @@ version: 1
 
 inputDir: "testdata/testproj"
 outputDir: "testdata/tmp/test1/1"
-outputStaticDir: "testdata/tmp/test1/1static"
 
 gitIgnored: true
 
@@ -24,3 +23,8 @@ transformations:
         title: "{{ .Origin.FirstHeader }}"
         lastmod: "TODO: Allow testing last mod .Origin.LastMod"
         slug: "{{ .Target.FileName }}"
+
+  - glob: "**.md"
+
+  - glob: "**"
+    path: "/../1static/**"
