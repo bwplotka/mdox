@@ -63,10 +63,10 @@ Flags:
       --links.validate.without-address-regex=^$  
                                  If specified, all links will be validated,
                                  except those matching the given target address.
-      --links.validate.without-github-links=""  
-                                 If specified, all links will be validated,
-                                 except the GitHub links for PRs and issues of
-                                 the given repo.
+      --links.validate.config=""  
+                                 Path to YAML file for skipping link check, with
+                                 spec defined in
+                                 github.com/bwplotka/mdox/pkg/linktranformer.Config
 
 Args:
   <files>  Markdown file(s) to process.

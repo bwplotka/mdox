@@ -244,16 +244,36 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Ok(t, err)
 	})
 
-	t.Run("check github links, skipped", func(t *testing.T) {
-		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "github-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://github.com/bwplotka/mdox/issues/23 https://github.com/bwplotka/mdox/pull/32 https://github.com/bwplotka/mdox/pull/27#pullrequestreview-659598194\n"), os.ModePerm))
+	t.Run("check links with validate config", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "links.md")
+		mdoxFile := filepath.Join(tmpDir, "mdox.yaml")
+
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://fakelink1.com/ http://fakelink2.com/ https://www.fakelink3.com/\n"), os.ModePerm))
+		testutil.Ok(t, ioutil.WriteFile(mdoxFile, []byte("version: 1\n\nvalidate:\n  validators:\n    - regex: '(^http[s]?:\\/\\/)(www\\.)?(fakelink[0-9]\\.com\\/)'\n      type: 'roundtrip'\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, regexp.MustCompile(`^$`), "bwplotka/mdox", anchorDir),
+			MustNewValidator(logger, regexp.MustCompile(`^$`), mdoxFile, anchorDir),
+		))
+		testutil.Ok(t, err)
+	})
+
+	t.Run("check github links with validate config", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "github-link.md")
+		mdoxFile := filepath.Join(tmpDir, "mdox.yaml")
+
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://github.com/bwplotka/mdox/issues/23 https://github.com/bwplotka/mdox/pull/32 https://github.com/bwplotka/mdox/pull/27#pullrequestreview-659598194\n"), os.ModePerm))
+		testutil.Ok(t, ioutil.WriteFile(mdoxFile, []byte("version: 1\n\nvalidate:\n  validators:\n    - regex: 'bwplotka\\/mdox'\n      type: 'github'\n"), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, regexp.MustCompile(`^$`), mdoxFile, anchorDir),
 		))
 		testutil.Ok(t, err)
 	})

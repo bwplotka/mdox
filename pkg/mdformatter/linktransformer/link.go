@@ -6,16 +6,11 @@ package linktransformer
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"io"
-	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -38,7 +33,6 @@ var (
 
 const (
 	originalURLKey = "originalURLKey"
-	gitHubAPIURL   = "https://api.github.com/repos/%v/%v?sort=created&direction=desc&per_page=1"
 )
 
 type chain struct {
@@ -116,11 +110,10 @@ func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destinat
 func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
 
 type validator struct {
-	logger     log.Logger
-	anchorDir  string
-	except     *regexp.Regexp
-	skipGitHub *regexp.Regexp
-	gitHubNum  int
+	logger         log.Logger
+	anchorDir      string
+	except         *regexp.Regexp
+	validateConfig Config
 
 	localLinks  localLinksCache
 	rMu         sync.RWMutex
@@ -143,21 +136,20 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, except *regexp.Regexp, repo string, anchorDir string) (mdformatter.LinkTransformer, error) {
-	skipGitHub, gitHubNum, err := getGitHubRegex(repo)
+func NewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig string, anchorDir string) (mdformatter.LinkTransformer, error) {
+	config, err := parseConfigFile(linksValidateConfig)
 	if err != nil {
 		return nil, err
 	}
 	v := &validator{
-		logger:      logger,
-		anchorDir:   anchorDir,
-		except:      except,
-		skipGitHub:  skipGitHub,
-		gitHubNum:   gitHubNum,
-		localLinks:  map[string]*[]string{},
-		remoteLinks: map[string]error{},
-		c:           colly.NewCollector(colly.Async()),
-		destFutures: map[futureKey]*futureResult{},
+		logger:         logger,
+		anchorDir:      anchorDir,
+		except:         except,
+		validateConfig: config,
+		localLinks:     map[string]*[]string{},
+		remoteLinks:    map[string]error{},
+		c:              colly.NewCollector(colly.Async()),
+		destFutures:    map[futureKey]*futureResult{},
 	}
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
@@ -183,62 +175,16 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, repo string, anchorD
 		defer v.rMu.Unlock()
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 	})
+	err = CheckGitHub(v.validateConfig)
+	if err != nil {
+		return nil, err
+	}
 	return v, nil
 }
 
-type GitHubResponse struct {
-	Number int `json:"number"`
-}
-
-func getGitHubRegex(reponame string) (*regexp.Regexp, int, error) {
-	if reponame != "" {
-		var pullNum []GitHubResponse
-		var issueNum []GitHubResponse
-		max := 0
-		// Check latest pull request number.
-		respPull, err := http.Get(fmt.Sprintf(gitHubAPIURL, reponame, "pulls"))
-		if err != nil {
-			return nil, math.MaxInt64, err
-		}
-		if respPull.StatusCode != 200 {
-			return nil, math.MaxInt64, errors.New("pulls API request failed. status code: " + strconv.Itoa(respPull.StatusCode))
-		}
-		defer respPull.Body.Close()
-		if err := json.NewDecoder(respPull.Body).Decode(&pullNum); err != nil {
-			return nil, math.MaxInt64, err
-		}
-		if len(pullNum) > 0 {
-			max = pullNum[0].Number
-		}
-
-		// Check latest issue number and return whichever is greater.
-		respIssue, err := http.Get(fmt.Sprintf(gitHubAPIURL, reponame, "issues"))
-		if err != nil {
-			return nil, math.MaxInt64, err
-		}
-		if respIssue.StatusCode != 200 {
-			return nil, math.MaxInt64, errors.New("issues API request failed. status code: " + strconv.Itoa(respIssue.StatusCode))
-		}
-		defer respIssue.Body.Close()
-		if err := json.NewDecoder(respIssue.Body).Decode(&issueNum); err != nil {
-			return nil, math.MaxInt64, err
-		}
-		if len(issueNum) > 0 && issueNum[0].Number > max {
-			max = issueNum[0].Number
-		}
-
-		// Place forward slash between org and repo to escape slash character.
-		idx := strings.Index(reponame, "/")
-		reponame = reponame[:idx] + `\` + reponame[idx:]
-		return regexp.MustCompile(`(^http[s]?:\/\/)(www\.)?(github\.com\/)(` + reponame + `)(\/pull\/|\/issues\/)`), max, nil
-	}
-
-	return regexp.MustCompile(`^$`), math.MaxInt64, nil
-}
-
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, except *regexp.Regexp, reponame string, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(logger, except, reponame, anchorDir)
+func MustNewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig string, anchorDir string) mdformatter.LinkTransformer {
+	v, err := NewValidator(logger, except, linksValidateConfig, anchorDir)
 	if err != nil {
 		panic(err)
 	}
@@ -299,16 +245,8 @@ func (v *validator) visit(filepath string, dest string) {
 	if v.except.MatchString(dest) {
 		return
 	}
-	if v.skipGitHub.MatchString(dest) {
-		// Find rightmost index of match i.e, where regex match ends.
-		// This will be where issue/PR number starts. Split incase of section link and convert to int.
-		idx := v.skipGitHub.FindStringIndex(dest)
-		stringNum := strings.Split(dest[idx[1]:], "#")
-		num, err := strconv.Atoi(stringNum[0])
-		// If number in link does not exceed then link is valid. Otherwise will be checked by v.c.Visit.
-		if v.gitHubNum >= num && err == nil {
-			return
-		}
+	if CheckValidators(dest, v.validateConfig) {
+		return
 	}
 
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
