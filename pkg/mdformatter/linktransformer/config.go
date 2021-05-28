@@ -5,8 +5,6 @@ package linktransformer
 
 import (
 	"bytes"
-	"io/ioutil"
-	"path/filepath"
 	"regexp"
 
 	"github.com/pkg/errors"
@@ -16,36 +14,22 @@ import (
 type Config struct {
 	Version int
 
-	Validate struct {
-		Validators []Validator `yaml:"validators"`
-	}
+	Validators []Validator `yaml:"validators"`
 }
 
 type Validator struct {
 	_regex  *regexp.Regexp
-	_maxnum int
+	_maxNum int
 	// Regex for type github is reponame matcher, like `bwplotka\/mdox`.
 	Regex string `yaml:"regex"`
 	// By default type is `roundtrip`. Could be `github`.
 	Type string `yaml:"type"`
 }
 
-func parseConfigFile(configFile string) (Config, error) {
-	if configFile == "" {
+func ParseConfig(c []byte) (Config, error) {
+	if string(c) == "" {
 		return Config{}, nil
 	}
-	configFile, err := filepath.Abs(configFile)
-	if err != nil {
-		return Config{}, errors.Wrap(err, "abs")
-	}
-	c, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return Config{}, errors.Wrap(err, "read config file")
-	}
-	return ParseConfig(c)
-}
-
-func ParseConfig(c []byte) (Config, error) {
 	cfg := Config{}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
@@ -53,12 +37,12 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, errors.Wrapf(err, "parsing YAML content %q", string(c))
 	}
 
-	if len(cfg.Validate.Validators) <= 0 {
+	if len(cfg.Validators) <= 0 {
 		return Config{}, errors.New("No validator provided")
 	}
 
-	for i := range cfg.Validate.Validators {
-		cfg.Validate.Validators[i]._regex = regexp.MustCompile(cfg.Validate.Validators[i].Regex)
+	for i := range cfg.Validators {
+		cfg.Validators[i]._regex = regexp.MustCompile(cfg.Validators[i].Regex)
 	}
 	return cfg, nil
 }

@@ -23,38 +23,45 @@ type GitHubResponse struct {
 	Number int `json:"number"`
 }
 
+type URLValidator struct {
+	Matched bool
+}
+
 // Match link with any one of provided validators.
-func CheckValidators(dest string, v Config) bool {
-	for _, val := range v.Validate.Validators {
-		if val._regex.MatchString(dest) {
+func (v Config) GetValidatorForURL(url string) URLValidator {
+	u := URLValidator{Matched: false}
+	for _, val := range v.Validators {
+		if val._regex.MatchString(url) {
 			if val.Type == "github" {
 				// Find rightmost index of match i.e, where regex match ends.
 				// This will be where issue/PR number starts. Split incase of section link and convert to int.
-				idx := val._regex.FindStringIndex(dest)
-				stringNum := strings.Split(dest[idx[1]:], "#")
+				idx := val._regex.FindStringIndex(url)
+				stringNum := strings.Split(url[idx[1]:], "#")
 				num, err := strconv.Atoi(stringNum[0])
 				// If number in link does not exceed then link is valid. Otherwise will be checked by v.c.Visit.
-				if val._maxnum >= num && err == nil {
-					return true
+				if val._maxNum >= num && err == nil {
+					u.Matched = true
+					return u
 				}
-				return false
+				return u
 			}
-			return true
+			u.Matched = true
+			return u
 		}
 	}
-	return false
+	return u
 }
 
 // If type is "github", change regex and add maxnum.
-func CheckGitHub(v Config) error {
-	for i := range v.Validate.Validators {
-		if v.Validate.Validators[i].Type == "github" {
-			regex, maxnum, err := getGitHubRegex(v.Validate.Validators[i].Regex)
+func (v Config) validateGH() error {
+	for i := range v.Validators {
+		if v.Validators[i].Type == "github" {
+			regex, maxNum, err := getGitHubRegex(v.Validators[i].Regex)
 			if err != nil {
 				return err
 			}
-			v.Validate.Validators[i]._regex = regex
-			v.Validate.Validators[i]._maxnum = maxnum
+			v.Validators[i]._regex = regex
+			v.Validators[i]._maxNum = maxNum
 		}
 	}
 	return nil
@@ -64,11 +71,12 @@ func CheckGitHub(v Config) error {
 func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
 	if repoRe != "" {
 		// Get reponame from regex.
-		idx := strings.Index(repoRe, `\`)
-		if idx == -1 {
+		getRepo := regexp.MustCompile(`(?P<org>[A-Za-z0-9_.-]+)\\\/(?P<repo>[A-Za-z0-9_.-]+)`)
+		match := getRepo.FindStringSubmatch(repoRe)
+		if len(match) != 3 {
 			return nil, math.MaxInt64, errors.New("repo name regex not valid")
 		}
-		reponame := repoRe[:idx] + repoRe[idx+1:]
+		reponame := match[1] + "/" + match[2]
 
 		var pullNum []GitHubResponse
 		var issueNum []GitHubResponse

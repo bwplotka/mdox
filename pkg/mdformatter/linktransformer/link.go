@@ -112,7 +112,6 @@ func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
 type validator struct {
 	logger         log.Logger
 	anchorDir      string
-	except         *regexp.Regexp
 	validateConfig Config
 
 	localLinks  localLinksCache
@@ -136,15 +135,14 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig string, anchorDir string) (mdformatter.LinkTransformer, error) {
-	config, err := parseConfigFile(linksValidateConfig)
+func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
+	config, err := ParseConfig(linksValidateConfig)
 	if err != nil {
 		return nil, err
 	}
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
-		except:         except,
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
@@ -175,7 +173,7 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig 
 		defer v.rMu.Unlock()
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 	})
-	err = CheckGitHub(v.validateConfig)
+	err = v.validateConfig.validateGH()
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +181,8 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig 
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, except *regexp.Regexp, linksValidateConfig string, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(logger, except, linksValidateConfig, anchorDir)
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
+	v, err := NewValidator(logger, linksValidateConfig, anchorDir)
 	if err != nil {
 		panic(err)
 	}
@@ -242,10 +240,8 @@ func (v *validator) visit(filepath string, dest string) {
 		return
 	}
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
-	if v.except.MatchString(dest) {
-		return
-	}
-	if CheckValidators(dest, v.validateConfig) {
+	validator := v.validateConfig.GetValidatorForURL(dest)
+	if validator.Matched {
 		return
 	}
 
