@@ -1,14 +1,20 @@
 version: 1
 
 inputDir: "testdata/testproj"
-outputDir: "testdata/tmp/2"
+outputDir: "testdata/tmp/test2/2"
 extraInputGlobs:
   - "testdata/test.md"
+  - "testdata/teststatic"
 
 gitIgnored: true
-localLinksStyle: hugo
+localLinksStyle:
+  hugo:
+    indexFileName: "_index.md"
 
 transformations:
+  - glob: "../teststatic/**"
+    path: /favicons/**
+
   - glob: "../test.md"
     path: /_index.md
     frontMatter:

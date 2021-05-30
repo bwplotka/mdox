@@ -16,17 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type LinksStyle string
-
-const (
-	None LinksStyle = ""
-
+type LocalLinksStyle struct {
 	// Hugo make sure mdox converts the links to work on Hugo-like website so:
 	// * Adds `slug: {{ FileName }}` to make sure filename extension is part of path, if slug is not added.
 	// * Local links are lower cased (hugo does that by default).
-	// * All links are expected to be paths e.g ../ is added to all local links.
-	Hugo LinksStyle = "hugo"
-)
+	// * All links are expected to be paths e.g ../ is added if they target local, non directory links.
+	Hugo *HugoLocalLinksStyle
+}
+type HugoLocalLinksStyle struct {
+	// e.g for google/docsy it is "_index.md"
+	IndexFileName string `yaml:"indexFileName"`
+}
 
 type Config struct {
 	Version int
@@ -36,21 +36,18 @@ type Config struct {
 	// OutputDir is a relative (to PWD) output directory that we expect all files to land in. Typically that can be `content` dir
 	// which hugo uses as an input.
 	OutputDir string `yaml:"outputDir"`
-	// OutputStaticDir is relative (to PWD) output directory for all non markdown files.
-	OutputStaticDir string `yaml:"outputStaticDir"`
 
 	// ExtraInputGlobs allows to bring files from outside of input dir.
-	// NOTE: No one can link to this file from input dir.
 	ExtraInputGlobs []string `yaml:"extraInputGlobs"`
 
-	// Transformations to apply for any file with .md extension.
+	// Transformations to apply for any file.
 	Transformations []*TransformationConfig
 
 	// GitIgnored specifies if output dir should be git ignored or not.
 	GitIgnored bool `yaml:"gitIgnored"`
 
-	// LocalLinksStyle sets linking style to be applied.
-	LocalLinksStyle LinksStyle `yaml:"localLinksStyle"`
+	// LocalLinksStyle sets linking style to be applied. If empty, we assume default style.
+	LocalLinksStyle LocalLinksStyle `yaml:"localLinksStyle"`
 }
 
 type TransformationConfig struct {
@@ -69,10 +66,45 @@ type TransformationConfig struct {
 	// Use absolute path to point the absolute structure where `/` means output directory.
 	// If relative path is used, it will start in the directory the file is in the input directory.
 	// NOTE: All relative links will be moved accordingly inside such file.
+	// TODO(bwplotka): Explain ** and * suffixes and ability to specify "invalid" paths like "/../".
 	Path string
 
 	// FrontMatter holds front matter transformations.
 	FrontMatter *FrontMatterConfig `yaml:"frontMatter"`
+}
+
+func (tr TransformationConfig) targetRelPath(relPath string) (_ string, err error) {
+	if tr.Path == "" {
+		return relPath, nil
+	}
+
+	if dir, file := filepath.Split(strings.TrimSuffix(tr.Glob, filepath.Ext(tr.Glob))); file == "**" {
+		relPath, err = filepath.Rel(dir, relPath)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	currDir, currFile := filepath.Split(relPath)
+	targetDir, targetSuffix := filepath.Split(strings.TrimPrefix(tr.Path, "/"))
+
+	if strings.HasSuffix(tr.Path, "/*") {
+		targetSuffix = currFile
+	} else if strings.HasSuffix(tr.Path, "/**") {
+		if !filepath.IsAbs(tr.Path) {
+			return "", errors.Errorf("path has to be absolute if suffix /** is used, got %v", tr.Path)
+		}
+
+		targetSuffix = relPath
+		targetDir = filepath.Dir(strings.TrimPrefix(tr.Path, "/"))
+
+	}
+
+	if !filepath.IsAbs(tr.Path) {
+		targetDir = filepath.Join(currDir, targetDir)
+	}
+
+	return filepath.Join(targetDir, targetSuffix), nil
 }
 
 type FrontMatterConfig struct {
@@ -105,7 +137,7 @@ func ParseConfig(c []byte) (Config, error) {
 	}
 
 	if cfg.InputDir == "" {
-		return Config{}, errors.New("contentDir field is required")
+		return Config{}, errors.New("inputDir field is required")
 	}
 
 	d, err := os.Stat(cfg.InputDir)
@@ -113,12 +145,20 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, err
 	}
 	if !d.IsDir() {
-		return Config{}, errors.New("contentDir field is not pointing directory")
+		return Config{}, errors.New("inputDir field is not pointing to a directory")
+	}
+	cfg.InputDir, err = filepath.Abs(cfg.InputDir)
+	if err != nil {
+		return Config{}, err
 	}
 	cfg.InputDir = strings.TrimSuffix(cfg.InputDir, "/")
 
 	if cfg.OutputDir == "" {
 		return Config{}, errors.New("outputDir field is required")
+	}
+	cfg.OutputDir, err = filepath.Abs(cfg.OutputDir)
+	if err != nil {
+		return Config{}, err
 	}
 	cfg.OutputDir = strings.TrimSuffix(cfg.OutputDir, "/")
 
