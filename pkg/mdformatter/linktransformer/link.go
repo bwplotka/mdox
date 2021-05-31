@@ -136,9 +136,13 @@ type futureResult struct {
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
 func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
-	config, err := ParseConfig(linksValidateConfig)
-	if err != nil {
-		return nil, err
+	var config Config
+	var err error
+	if string(linksValidateConfig) != "" {
+		config, err = ParseConfig(linksValidateConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 	v := &validator{
 		logger:         logger,

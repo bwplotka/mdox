@@ -11,6 +11,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const roundtrip ValidatorType = "roundtrip"
+
+// const github ValidatorType = "github"
+
 type Config struct {
 	Version int
 
@@ -23,13 +27,12 @@ type Validator struct {
 	// Regex for type github is reponame matcher, like `bwplotka\/mdox`.
 	Regex string `yaml:"regex"`
 	// By default type is `roundtrip`. Could be `github`.
-	Type string `yaml:"type"`
+	Type ValidatorType `yaml:"type"`
 }
 
+type ValidatorType string
+
 func ParseConfig(c []byte) (Config, error) {
-	if string(c) == "" {
-		return Config{}, nil
-	}
 	cfg := Config{}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
