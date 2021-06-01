@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -86,8 +87,30 @@ func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
 	var pullNum []GitHubResponse
 	var issueNum []GitHubResponse
 	max := 0
+	// All GitHub API reqs need to have User-Agent: https://docs.github.com/en/rest/overview/resources-in-the-rest-api#user-agent-required.
+	client := &http.Client{}
+	repoToken := os.Getenv("GITHUB_TOKEN")
+
 	// Check latest pull request number.
-	respPull, err := http.Get(fmt.Sprintf(gitHubAPIURL, reponame, "pulls"))
+	reqPull, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "pulls"), nil)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	reqPull.Header.Set("User-Agent", "mdox")
+
+	// Check latest issue number and return whichever is greater.
+	reqIssue, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "issues"), nil)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	reqIssue.Header.Set("User-Agent", "mdox")
+
+	if repoToken != "" {
+		reqPull.Header.Set("Authorization", "Bearer "+repoToken)
+		reqIssue.Header.Set("Authorization", "Bearer "+repoToken)
+	}
+
+	respPull, err := client.Do(reqPull)
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
@@ -98,12 +121,8 @@ func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
 	if err := json.NewDecoder(respPull.Body).Decode(&pullNum); err != nil {
 		return nil, math.MaxInt64, err
 	}
-	if len(pullNum) > 0 {
-		max = pullNum[0].Number
-	}
 
-	// Check latest issue number and return whichever is greater.
-	respIssue, err := http.Get(fmt.Sprintf(gitHubAPIURL, reponame, "issues"))
+	respIssue, err := client.Do(reqIssue)
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
@@ -113,6 +132,10 @@ func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
 	defer respIssue.Body.Close()
 	if err := json.NewDecoder(respIssue.Body).Decode(&issueNum); err != nil {
 		return nil, math.MaxInt64, err
+	}
+
+	if len(pullNum) > 0 {
+		max = pullNum[0].Number
 	}
 	if len(issueNum) > 0 && issueNum[0].Number > max {
 		max = issueNum[0].Number
