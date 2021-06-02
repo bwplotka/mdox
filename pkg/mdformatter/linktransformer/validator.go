@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,7 +63,7 @@ func (v Config) validateGH() error {
 			v.Validators[i]._maxNum = math.MaxInt64
 			continue
 		}
-		regex, maxNum, err := getGitHubRegex(v.Validators[i].Regex)
+		regex, maxNum, err := getGitHubRegex(v.Validators[i].Regex, v.Validators[i].Token)
 		if err != nil {
 			return err
 		}
@@ -75,7 +74,7 @@ func (v Config) validateGH() error {
 }
 
 // getGitHubRegex returns GitHub pulls/issues regex from repo name.
-func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
+func getGitHubRegex(repoRe string, repoToken string) (*regexp.Regexp, int, error) {
 	// Get reponame from regex.
 	getRepo := regexp.MustCompile(`(?P<org>[A-Za-z0-9_.-]+)\\\/(?P<repo>[A-Za-z0-9_.-]+)`)
 	match := getRepo.FindStringSubmatch(repoRe)
@@ -89,7 +88,6 @@ func getGitHubRegex(repoRe string) (*regexp.Regexp, int, error) {
 	max := 0
 	// All GitHub API reqs need to have User-Agent: https://docs.github.com/en/rest/overview/resources-in-the-rest-api#user-agent-required.
 	client := &http.Client{}
-	repoToken := os.Getenv("GITHUB_TOKEN")
 
 	// Check latest pull request number.
 	reqPull, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "pulls"), nil)

@@ -28,6 +28,8 @@ type Validator struct {
 	Regex string `yaml:"regex"`
 	// By default type is `roundtrip`. Could be `github`.
 	Type ValidatorType `yaml:"type"`
+	// GitHub repo token to avoid getting rate limited.
+	Token string `yaml:"token"`
 }
 
 type ValidatorType string

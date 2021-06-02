@@ -10,6 +10,9 @@ package extflag
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -19,7 +22,8 @@ import (
 type PathOrContent struct {
 	flagName string
 
-	required bool
+	envSubstitution bool
+	required        bool
 
 	path    *string
 	content *string
@@ -30,7 +34,7 @@ type FlagClause interface {
 }
 
 // RegisterPathOrContent registers PathOrContent flag in kingpinCmdClause.
-func RegisterPathOrContent(cmd FlagClause, flagName string, help string, required bool) *PathOrContent {
+func RegisterPathOrContent(cmd FlagClause, flagName string, help string, required bool, envSubstitution bool) *PathOrContent {
 	fileFlagName := fmt.Sprintf("%s-file", flagName)
 	contentFlagName := flagName
 
@@ -41,10 +45,11 @@ func RegisterPathOrContent(cmd FlagClause, flagName string, help string, require
 	contentFlag := cmd.Flag(contentFlagName, contentHelp).PlaceHolder("<content>").String()
 
 	return &PathOrContent{
-		flagName: flagName,
-		required: required,
-		path:     fileFlag,
-		content:  contentFlag,
+		flagName:        flagName,
+		required:        required,
+		path:            fileFlag,
+		content:         contentFlag,
+		envSubstitution: envSubstitution,
 	}
 }
 
@@ -74,6 +79,25 @@ func (p *PathOrContent) Content() ([]byte, error) {
 	if len(content) == 0 && p.required {
 		return nil, errors.Errorf("flag %s or %s is required for running this command and content cannot be empty.", fileFlagName, p.flagName)
 	}
-
+	if p.envSubstitution {
+		content = substituteEnvVars(string(content))
+	}
 	return content, nil
+}
+
+// substituteEnvVars returns content of YAML file with substituted environment variables.
+// Will be substituted with empty string if env var isn't set.
+// Follows K8s convention, i.e $(...), as mentioned here https://kubernetes.io/docs/tasks/inject-data-application/define-interdependent-environment-variables/.
+func substituteEnvVars(content string) []byte {
+	var replaceWithEnv []string
+	// Match env variable syntax.
+	envVarName := regexp.MustCompile(`\$\((?P<var>[a-zA-Z_]+[a-zA-Z0-9_]*)\)`)
+	loc := envVarName.FindAllStringSubmatchIndex(content, -1)
+	for i := range loc {
+		// Add pair to be replaced.
+		replaceWithEnv = append(replaceWithEnv, content[loc[i][0]:loc[i][1]], os.Getenv(content[loc[i][2]:loc[i][3]]))
+	}
+	replacer := strings.NewReplacer(replaceWithEnv...)
+	contentWithEnv := replacer.Replace(content)
+	return []byte(contentWithEnv)
 }
