@@ -136,8 +136,8 @@ type futureResult struct {
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
 func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
-	var config Config
 	var err error
+	config := Config{}
 	if string(linksValidateConfig) != "" {
 		config, err = ParseConfig(linksValidateConfig)
 		if err != nil {
@@ -177,10 +177,6 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 		defer v.rMu.Unlock()
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 	})
-	err = v.validateConfig.validateGH()
-	if err != nil {
-		return nil, err
-	}
 	return v, nil
 }
 
@@ -244,11 +240,6 @@ func (v *validator) visit(filepath string, dest string) {
 		return
 	}
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
-	validator := v.validateConfig.GetValidatorForURL(dest)
-	if validator.Matched {
-		return
-	}
-
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
 		// Relative or absolute path. Check if exists.
@@ -259,6 +250,13 @@ func (v *validator) visit(filepath string, dest string) {
 			v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
 		}
 		return
+	}
+	validator := v.validateConfig.GetValidatorForURL(dest)
+	if validator != nil {
+		matched, err := validator.IsValid(dest)
+		if matched && err == nil {
+			return
+		}
 	}
 
 	// Result will be in future.

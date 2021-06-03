@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -29,12 +28,15 @@ type PathOrContent struct {
 	content *string
 }
 
+// Option is a functional option type for PathOrContent objects.
+type Option func(*PathOrContent)
+
 type FlagClause interface {
 	Flag(name, help string) *kingpin.FlagClause
 }
 
 // RegisterPathOrContent registers PathOrContent flag in kingpinCmdClause.
-func RegisterPathOrContent(cmd FlagClause, flagName string, help string, required bool, envSubstitution bool) *PathOrContent {
+func RegisterPathOrContent(cmd FlagClause, flagName string, help string, opts ...Option) *PathOrContent {
 	fileFlagName := fmt.Sprintf("%s-file", flagName)
 	contentFlagName := flagName
 
@@ -44,13 +46,17 @@ func RegisterPathOrContent(cmd FlagClause, flagName string, help string, require
 	contentHelp := fmt.Sprintf("Alternative to '%s' flag (mutually exclusive). Content of %s", fileFlagName, help)
 	contentFlag := cmd.Flag(contentFlagName, contentHelp).PlaceHolder("<content>").String()
 
-	return &PathOrContent{
+	p := &PathOrContent{
 		flagName:        flagName,
-		required:        required,
 		path:            fileFlag,
 		content:         contentFlag,
-		envSubstitution: envSubstitution,
+		required:        false,
+		envSubstitution: false,
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 // Content returns the content of the file when given or directly the content that has been passed to the flag.
@@ -80,24 +86,45 @@ func (p *PathOrContent) Content() ([]byte, error) {
 		return nil, errors.Errorf("flag %s or %s is required for running this command and content cannot be empty.", fileFlagName, p.flagName)
 	}
 	if p.envSubstitution {
-		content = substituteEnvVars(string(content))
+		replace, err := expandEnv(content)
+		if err != nil {
+			return nil, err
+		}
+		content = replace
 	}
 	return content, nil
 }
 
-// substituteEnvVars returns content of YAML file with substituted environment variables.
-// Will be substituted with empty string if env var isn't set.
-// Follows K8s convention, i.e $(...), as mentioned here https://kubernetes.io/docs/tasks/inject-data-application/define-interdependent-environment-variables/.
-func substituteEnvVars(content string) []byte {
-	var replaceWithEnv []string
-	// Match env variable syntax.
-	envVarName := regexp.MustCompile(`\$\((?P<var>[a-zA-Z_]+[a-zA-Z0-9_]*)\)`)
-	loc := envVarName.FindAllStringSubmatchIndex(content, -1)
-	for i := range loc {
-		// Add pair to be replaced.
-		replaceWithEnv = append(replaceWithEnv, content[loc[i][0]:loc[i][1]], os.Getenv(content[loc[i][2]:loc[i][3]]))
+// WithRequired allows you to override default required option.
+func WithRequired(r bool) Option {
+	return func(p *PathOrContent) {
+		p.required = r
 	}
-	replacer := strings.NewReplacer(replaceWithEnv...)
-	contentWithEnv := replacer.Replace(content)
-	return []byte(contentWithEnv)
+}
+
+// WithRequired allows you to override default envSubstitution option.
+func WithEnvSubstitution(e bool) Option {
+	return func(p *PathOrContent) {
+		p.envSubstitution = e
+	}
+}
+
+// expandEnv returns content of YAML file with substituted environment variables.
+// Follows K8s convention, i.e $(...), as mentioned here https://kubernetes.io/docs/tasks/inject-data-application/define-interdependent-environment-variables/.
+func expandEnv(b []byte) (r []byte, err error) {
+	var envRe = regexp.MustCompile(`\$\(([a-zA-Z_0-9]+)\)`)
+	r = envRe.ReplaceAllFunc(b, func(n []byte) []byte {
+		if err != nil {
+			return nil
+		}
+		n = n[2 : len(n)-1]
+
+		v, ok := os.LookupEnv(string(n))
+		if !ok {
+			err = errors.Errorf("found reference to unset environment variable %q", n)
+			return nil
+		}
+		return []byte(v)
+	})
+	return r, err
 }
