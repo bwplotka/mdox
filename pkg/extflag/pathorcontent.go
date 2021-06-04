@@ -96,16 +96,16 @@ func (p *PathOrContent) Content() ([]byte, error) {
 }
 
 // WithRequired allows you to override default required option.
-func WithRequired(r bool) Option {
+func WithRequired() Option {
 	return func(p *PathOrContent) {
-		p.required = r
+		p.required = true
 	}
 }
 
 // WithRequired allows you to override default envSubstitution option.
-func WithEnvSubstitution(e bool) Option {
+func WithEnvSubstitution() Option {
 	return func(p *PathOrContent) {
-		p.envSubstitution = e
+		p.envSubstitution = true
 	}
 }
 

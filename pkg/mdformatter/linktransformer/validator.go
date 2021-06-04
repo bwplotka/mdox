@@ -6,18 +6,20 @@ package linktransformer
 import (
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type Validator interface {
-	IsValid(URL string) (bool, error)
+	IsValid(k futureKey, r *validator) (bool, error)
 }
 
 // GitHubValidator.IsValid skips visiting all github issue/PR links.
-func (v GitHubValidator) IsValid(URL string) (bool, error) {
+func (v GitHubValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	// Find rightmost index of match i.e, where regex match ends.
 	// This will be where issue/PR number starts. Split incase of section link and convert to int.
-	rightmostIndex := v._regex.FindStringIndex(URL)
-	stringNum := strings.Split(URL[rightmostIndex[1]:], "#")
+	rightmostIndex := v._regex.FindStringIndex(k.dest)
+	stringNum := strings.Split(k.dest[rightmostIndex[1]:], "#")
 	num, err := strconv.Atoi(stringNum[0])
 	if err != nil {
 		return false, err
@@ -29,48 +31,59 @@ func (v GitHubValidator) IsValid(URL string) (bool, error) {
 	return false, nil
 }
 
-// RoundTripValidator.IsValid returns false if url matches, to ensure it is visited by colly.
-func (v RoundTripValidator) IsValid(URL string) (bool, error) {
-	return false, nil
+// RoundTripValidator.IsValid returns true if url is checked by colly.
+func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
+	// Result will be in future.
+	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }
+	r.rMu.RLock()
+	if _, ok := r.remoteLinks[k.dest]; ok {
+		r.rMu.RUnlock()
+		return true, nil
+	}
+	r.rMu.RUnlock()
+
+	r.rMu.Lock()
+	defer r.rMu.Unlock()
+	// We need to check again here to avoid race.
+	if _, ok := r.remoteLinks[k.dest]; ok {
+		return true, nil
+	}
+
+	if err := r.c.Visit(k.dest); err != nil {
+		r.remoteLinks[k.dest] = errors.Wrapf(err, "remote link %v", k.dest)
+		return false, nil
+	}
+	return true, nil
 }
 
 // IgnoreValidator.IsValid returns true if matched so that link in not checked.
-func (v IgnoreValidator) IsValid(URL string) (bool, error) {
+func (v IgnoreValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	return true, nil
 }
 
 // GetValidatorForURL returns correct Validator by matching URL.
 func (v Config) GetValidatorForURL(URL string) Validator {
-	var u Validator
 	for _, val := range v.Validators {
 		switch val.Type {
 		case roundtripValidator:
 			if !val.rtValidator._regex.MatchString(URL) {
 				continue
 			}
-			u = val.rtValidator
-			return u
+			return val.rtValidator
 		case githubValidator:
 			if !val.ghValidator._regex.MatchString(URL) {
 				continue
 			}
-			u = val.ghValidator
-			return u
+			return val.ghValidator
 		case ignoreValidator:
 			if !val.igValidator._regex.MatchString(URL) {
 				continue
 			}
-			u = val.igValidator
-			return u
+			return val.igValidator
 		default:
-			continue
+			panic("unexpected validator type")
 		}
 	}
-	// By default all links are ignored.
-	u = IgnoreValidator{}
 	// No config file passed, so all links must be checked.
-	if len(v.Validators) == 0 {
-		u = nil
-	}
-	return u
+	return RoundTripValidator{}
 }

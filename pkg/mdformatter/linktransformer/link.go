@@ -253,30 +253,10 @@ func (v *validator) visit(filepath string, dest string) {
 	}
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {
-		matched, err := validator.IsValid(dest)
+		matched, err := validator.IsValid(k, v)
 		if matched && err == nil {
 			return
 		}
-	}
-
-	// Result will be in future.
-	v.destFutures[k].resultFn = func() error { return v.remoteLinks[dest] }
-	v.rMu.RLock()
-	if _, ok := v.remoteLinks[dest]; ok {
-		v.rMu.RUnlock()
-		return
-	}
-	v.rMu.RUnlock()
-
-	v.rMu.Lock()
-	defer v.rMu.Unlock()
-	// We need to check again here to avoid race.
-	if _, ok := v.remoteLinks[dest]; ok {
-		return
-	}
-
-	if err := v.c.Visit(dest); err != nil {
-		v.remoteLinks[dest] = errors.Wrapf(err, "remote link %v", dest)
 	}
 }
 
