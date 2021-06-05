@@ -110,9 +110,9 @@ func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destinat
 func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
 
 type validator struct {
-	logger    log.Logger
-	anchorDir string
-	except    *regexp.Regexp
+	logger         log.Logger
+	anchorDir      string
+	validateConfig Config
 
 	localLinks  localLinksCache
 	rMu         sync.RWMutex
@@ -135,15 +135,23 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (mdformatter.LinkTransformer, error) {
+func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
+	var err error
+	config := Config{}
+	if string(linksValidateConfig) != "" {
+		config, err = ParseConfig(linksValidateConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
 	v := &validator{
-		logger:      logger,
-		anchorDir:   anchorDir,
-		except:      except,
-		localLinks:  map[string]*[]string{},
-		remoteLinks: map[string]error{},
-		c:           colly.NewCollector(colly.Async()),
-		destFutures: map[futureKey]*futureResult{},
+		logger:         logger,
+		anchorDir:      anchorDir,
+		validateConfig: config,
+		localLinks:     map[string]*[]string{},
+		remoteLinks:    map[string]error{},
+		c:              colly.NewCollector(colly.Async()),
+		destFutures:    map[futureKey]*futureResult{},
 	}
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
@@ -173,8 +181,8 @@ func NewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) (m
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, except *regexp.Regexp, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(logger, except, anchorDir)
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
+	v, err := NewValidator(logger, linksValidateConfig, anchorDir)
 	if err != nil {
 		panic(err)
 	}
@@ -232,10 +240,6 @@ func (v *validator) visit(filepath string, dest string) {
 		return
 	}
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
-	if v.except.MatchString(dest) {
-		return
-	}
-
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
 		// Relative or absolute path. Check if exists.
@@ -247,25 +251,12 @@ func (v *validator) visit(filepath string, dest string) {
 		}
 		return
 	}
-
-	// Result will be in future.
-	v.destFutures[k].resultFn = func() error { return v.remoteLinks[dest] }
-	v.rMu.RLock()
-	if _, ok := v.remoteLinks[dest]; ok {
-		v.rMu.RUnlock()
-		return
-	}
-	v.rMu.RUnlock()
-
-	v.rMu.Lock()
-	defer v.rMu.Unlock()
-	// We need to check again here to avoid race.
-	if _, ok := v.remoteLinks[dest]; ok {
-		return
-	}
-
-	if err := v.c.Visit(dest); err != nil {
-		v.remoteLinks[dest] = errors.Wrapf(err, "remote link %v", dest)
+	validator := v.validateConfig.GetValidatorForURL(dest)
+	if validator != nil {
+		matched, err := validator.IsValid(k, v)
+		if matched && err == nil {
+			return
+		}
 	}
 }
 

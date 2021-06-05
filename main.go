@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/bwplotka/mdox/pkg/clilog"
+	"github.com/bwplotka/mdox/pkg/extflag"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/bwplotka/mdox/pkg/mdformatter/linktransformer"
@@ -126,7 +127,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
 	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
-	linksValidateExceptDomains := cmd.Flag("links.validate.without-address-regex", "If specified, all links will be validated, except those matching the given target address.").Default(`^$`).Regexp()
+	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.Config", extflag.WithEnvSubstitution())
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var opts []mdformatter.Option
@@ -151,7 +152,11 @@ This directive runs executable with arguments and put its stderr and stdout outp
 
 		var linkTr []mdformatter.LinkTransformer
 		if *linksValidateEnabled {
-			v, err := linktransformer.NewValidator(logger, *linksValidateExceptDomains, anchorDir)
+			validateConfigContent, err := linksValidateConfig.Content()
+			if err != nil {
+				return err
+			}
+			v, err := linktransformer.NewValidator(logger, validateConfigContent, anchorDir)
 			if err != nil {
 				return err
 			}

@@ -1,0 +1,167 @@
+// Copyright (c) Bartłomiej Płotka @bwplotka
+// Licensed under the Apache License 2.0.
+
+package linktransformer
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"math"
+	"net/http"
+	"regexp"
+	"strconv"
+
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Version int
+
+	Validators []ValidatorConfig `yaml:"validators"`
+}
+
+type ValidatorConfig struct {
+	// Regex for type github is reponame matcher, like `bwplotka\/mdox`.
+	Regex string `yaml:"regex"`
+	// By default type is `ignore`. Could be `github` or `roundtrip`.
+	Type ValidatorType `yaml:"type"`
+	// GitHub repo token to avoid getting rate limited.
+	Token string `yaml:"token"`
+
+	ghValidator GitHubValidator
+	rtValidator RoundTripValidator
+	igValidator IgnoreValidator
+}
+
+type RoundTripValidator struct {
+	_regex *regexp.Regexp
+}
+
+type GitHubValidator struct {
+	_regex  *regexp.Regexp
+	_maxNum int
+}
+
+type IgnoreValidator struct {
+	_regex *regexp.Regexp
+}
+
+type ValidatorType string
+
+const (
+	roundtripValidator ValidatorType = "roundtrip"
+	githubValidator    ValidatorType = "github"
+	ignoreValidator    ValidatorType = "ignore"
+)
+
+const (
+	gitHubAPIURL = "https://api.github.com/repos/%v/%v?sort=created&direction=desc&per_page=1"
+)
+
+type GitHubResponse struct {
+	Number int `json:"number"`
+}
+
+func ParseConfig(c []byte) (Config, error) {
+	cfg := Config{}
+	dec := yaml.NewDecoder(bytes.NewReader(c))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
+		return Config{}, errors.Wrapf(err, "parsing YAML content %q", string(c))
+	}
+
+	if len(cfg.Validators) <= 0 {
+		return Config{}, errors.New("No validator provided")
+	}
+
+	// Evaluate regex for given validators.
+	for i := range cfg.Validators {
+		switch cfg.Validators[i].Type {
+		case roundtripValidator:
+			cfg.Validators[i].rtValidator._regex = regexp.MustCompile(cfg.Validators[i].Regex)
+		case githubValidator:
+			regex, maxNum, err := getGitHubRegex(cfg.Validators[i].Regex, cfg.Validators[i].Token)
+			if err != nil {
+				return Config{}, errors.Wrapf(err, "parsing GitHub Regex %v", err)
+			}
+			cfg.Validators[i].ghValidator._regex = regex
+			cfg.Validators[i].ghValidator._maxNum = maxNum
+		case ignoreValidator:
+			cfg.Validators[i].igValidator._regex = regexp.MustCompile(cfg.Validators[i].Regex)
+		default:
+			return Config{}, errors.New("Validator type not supported")
+		}
+	}
+	return cfg, nil
+}
+
+// getGitHubRegex returns GitHub pulls/issues regex from repo name.
+func getGitHubRegex(repoRe string, repoToken string) (*regexp.Regexp, int, error) {
+	// Get reponame from regex.
+	getRepo := regexp.MustCompile(`(?P<org>[A-Za-z0-9_.-]+)\\\/(?P<repo>[A-Za-z0-9_.-]+)`)
+	match := getRepo.FindStringSubmatch(repoRe)
+	if len(match) != 3 {
+		return nil, math.MaxInt64, errors.New("repo name regex not valid")
+	}
+	reponame := match[1] + "/" + match[2]
+
+	var pullNum []GitHubResponse
+	var issueNum []GitHubResponse
+	max := 0
+	// All GitHub API reqs need to have User-Agent: https://docs.github.com/en/rest/overview/resources-in-the-rest-api#user-agent-required.
+	client := &http.Client{}
+
+	// Check latest pull request number.
+	reqPull, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "pulls"), nil)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	reqPull.Header.Set("User-Agent", "mdox")
+
+	// Check latest issue number and return whichever is greater.
+	reqIssue, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "issues"), nil)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	reqIssue.Header.Set("User-Agent", "mdox")
+
+	if repoToken != "" {
+		reqPull.Header.Set("Authorization", "Bearer "+repoToken)
+		reqIssue.Header.Set("Authorization", "Bearer "+repoToken)
+	}
+
+	respPull, err := client.Do(reqPull)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	if respPull.StatusCode != 200 {
+		return nil, math.MaxInt64, errors.New("pulls API request failed. status code: " + strconv.Itoa(respPull.StatusCode))
+	}
+	defer respPull.Body.Close()
+	if err := json.NewDecoder(respPull.Body).Decode(&pullNum); err != nil {
+		return nil, math.MaxInt64, err
+	}
+
+	respIssue, err := client.Do(reqIssue)
+	if err != nil {
+		return nil, math.MaxInt64, err
+	}
+	if respIssue.StatusCode != 200 {
+		return nil, math.MaxInt64, errors.New("issues API request failed. status code: " + strconv.Itoa(respIssue.StatusCode))
+	}
+	defer respIssue.Body.Close()
+	if err := json.NewDecoder(respIssue.Body).Decode(&issueNum); err != nil {
+		return nil, math.MaxInt64, err
+	}
+
+	if len(pullNum) > 0 {
+		max = pullNum[0].Number
+	}
+	if len(issueNum) > 0 && issueNum[0].Number > max {
+		max = issueNum[0].Number
+	}
+
+	return regexp.MustCompile(`(^http[s]?:\/\/)(www\.)?(github\.com\/)(` + repoRe + `)(\/pull\/|\/issues\/)`), max, nil
+}
