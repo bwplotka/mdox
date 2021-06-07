@@ -4,9 +4,11 @@
 package linktransformer
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/bwplotka/mdox/pkg/config"
 	"github.com/pkg/errors"
 )
 
@@ -14,18 +16,24 @@ type Validator interface {
 	IsValid(k futureKey, r *validator) (bool, error)
 }
 
+type RoundTripValidator config.RoundTripValidator
+
+type GitHubValidator config.GitHubValidator
+
+type IgnoreValidator config.IgnoreValidator
+
 // GitHubValidator.IsValid skips visiting all github issue/PR links.
 func (v GitHubValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	// Find rightmost index of match i.e, where regex match ends.
 	// This will be where issue/PR number starts. Split incase of section link and convert to int.
-	rightmostIndex := v._regex.FindStringIndex(k.dest)
+	rightmostIndex := v.Regex.FindStringIndex(k.dest)
 	stringNum := strings.Split(k.dest[rightmostIndex[1]:], "#")
 	num, err := strconv.Atoi(stringNum[0])
 	if err != nil {
 		return false, err
 	}
 	// If number in link does not exceed then link is valid.
-	if v._maxNum >= num {
+	if v.MaxNum >= num {
 		return true, nil
 	}
 	return false, nil
@@ -62,26 +70,26 @@ func (v IgnoreValidator) IsValid(k futureKey, r *validator) (bool, error) {
 }
 
 // GetValidatorForURL returns correct Validator by matching URL.
-func (v Config) GetValidatorForURL(URL string) Validator {
+func GetValidatorForURL(URL string, v config.Config) Validator {
 	for _, val := range v.Validators {
 		switch val.Type {
-		case roundtripValidator:
-			if !val.rtValidator._regex.MatchString(URL) {
+		case config.RoundTrip:
+			if !val.RtValidator.Regex.MatchString(URL) {
 				continue
 			}
-			return val.rtValidator
-		case githubValidator:
-			if !val.ghValidator._regex.MatchString(URL) {
+			return RoundTripValidator(val.RtValidator)
+		case config.GitHub:
+			if !val.GhValidator.Regex.MatchString(URL) {
 				continue
 			}
-			return val.ghValidator
-		case ignoreValidator:
-			if !val.igValidator._regex.MatchString(URL) {
+			return GitHubValidator(val.GhValidator)
+		case config.Ignore:
+			if !val.IgValidator.Regex.MatchString(URL) {
 				continue
 			}
-			return val.igValidator
+			return IgnoreValidator(val.IgValidator)
 		default:
-			panic("unexpected validator type")
+			panic(fmt.Sprintf("unexpected validator type %v", val.Type))
 		}
 	}
 	// No config file passed, so all links must be checked.

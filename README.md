@@ -63,12 +63,12 @@ Flags:
       --links.validate.config-file=<file-path>  
                                  Path to YAML file for skipping link check, with
                                  spec defined in
-                                 github.com/bwplotka/mdox/pkg/linktransformer.Config
+                                 github.com/bwplotka/mdox/pkg/config.Config
       --links.validate.config=<content>  
                                  Alternative to 'links.validate.config-file'
                                  flag (mutually exclusive). Content of YAML file
                                  for skipping link check, with spec defined in
-                                 github.com/bwplotka/mdox/pkg/linktransformer.Config
+                                 github.com/bwplotka/mdox/pkg/config.Config
 
 Args:
   <files>  Markdown file(s) to process.

@@ -127,7 +127,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
 	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
-	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.Config", extflag.WithEnvSubstitution())
+	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/config.Config", extflag.WithEnvSubstitution())
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var opts []mdformatter.Option
@@ -209,9 +209,12 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 
 func registerTransform(_ context.Context, app *extkingpin.App) {
 	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
-	cfg := cmd.Flag("config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config").
-		Short('c').Default(".mdox.yaml").ExistingFile()
+	cfg := extflag.RegisterPathOrContent(cmd, "config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/config.Config", extflag.WithRequired())
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
-		return transform.Dir(ctx, logger, *cfg)
+		transformConfigContent, err := cfg.Content()
+		if err != nil {
+			return err
+		}
+		return transform.Dir(ctx, logger, transformConfigContent)
 	})
 }

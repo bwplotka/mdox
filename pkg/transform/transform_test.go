@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bwplotka/mdox/pkg/config"
 	"github.com/efficientgo/tools/pkg/testutil"
 	"github.com/pkg/errors"
 )
@@ -82,7 +83,7 @@ func TestNewTargetRelPath(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tcase), func(t *testing.T) {
-			o, err := TransformationConfig{Glob: tcase.glob, Path: tcase.path}.targetRelPath(tcase.relPath)
+			o, err := config.TransformationConfig{Glob: tcase.glob, Path: tcase.path}.TargetRelPath(tcase.relPath)
 			if tcase.expectedErr != nil {
 				testutil.NotOk(t, err)
 				testutil.Equals(t, tcase.expectedErr.Error(), err.Error())

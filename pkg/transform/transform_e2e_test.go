@@ -27,12 +27,18 @@ func TestTransform(t *testing.T) {
 	logger := log.NewLogfmtLogger(os.Stdout)
 
 	testutil.Ok(t, os.RemoveAll(tmpDir))
+
+	mdox1, err := ioutil.ReadFile(filepath.Join(testData, "mdox1.yaml"))
+	testutil.Ok(t, err)
+	mdox2, err := ioutil.ReadFile(filepath.Join(testData, "mdox2.yaml"))
+	testutil.Ok(t, err)
+
 	t.Run("mdox1.yaml", func(t *testing.T) {
-		testutil.Ok(t, transform.Dir(context.Background(), logger, filepath.Join(testData, "mdox1.yaml")))
+		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox1))
 		assertDirContent(t, filepath.Join(testData, "expected", "test1"), filepath.Join(tmpDir, "test1"))
 	})
 	t.Run("mdox2.yaml", func(t *testing.T) {
-		testutil.Ok(t, transform.Dir(context.Background(), logger, filepath.Join(testData, "mdox2.yaml")))
+		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox2))
 		assertDirContent(t, filepath.Join(testData, "expected", "test2"), filepath.Join(tmpDir, "test2"))
 
 	})

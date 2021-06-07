@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bwplotka/mdox/pkg/config"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/pkg/errcapture"
 	"github.com/go-kit/kit/log"
@@ -49,8 +50,8 @@ func prepOutputDir(d string, gitIgnored bool) error {
 }
 
 // Dir transforms directory using given configuration file.
-func Dir(ctx context.Context, logger log.Logger, configFile string) error {
-	c, err := parseConfigFile(configFile)
+func Dir(ctx context.Context, logger log.Logger, configFile []byte) error {
+	c, err := config.ParseTransformConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func Dir(ctx context.Context, logger log.Logger, configFile string) error {
 
 type transformer struct {
 	ctx    context.Context
-	c      Config
+	c      config.Config
 	logger log.Logger
 
 	filesToLinkAdjust []string
@@ -143,7 +144,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 	}
 
 	var opts []mdformatter.Option
-	newRelPath, err := tr.targetRelPath(relPath)
+	newRelPath, err := tr.TargetRelPath(relPath)
 	if err != nil {
 		return err
 	}
@@ -203,7 +204,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 }
 
 type relLinkTransformer struct {
-	localLinksStyle LocalLinksStyle
+	localLinksStyle config.LocalLinksStyle
 
 	inputDir   string
 	outputDir  string
@@ -275,8 +276,8 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 type frontMatterTransformer struct {
-	localLinksStyle LocalLinksStyle
-	c               *FrontMatterConfig
+	localLinksStyle config.LocalLinksStyle
+	c               *config.FrontMatterConfig
 
 	// Vars.
 	origin FrontMatterOrigin
@@ -295,7 +296,7 @@ type FrontMatterTarget struct {
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
 	b := bytes.Buffer{}
-	if err := f.c._template.Execute(&b, struct {
+	if err := f.c.ParsedTemplate.Execute(&b, struct {
 		Origin      FrontMatterOrigin
 		Target      FrontMatterTarget
 		FrontMatter map[string]interface{}
@@ -323,9 +324,9 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 
 func (f *frontMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
 
-func firstMatch(absRelPath string, trs []*TransformationConfig) (*TransformationConfig, bool) {
+func firstMatch(absRelPath string, trs []*config.TransformationConfig) (*config.TransformationConfig, bool) {
 	for _, tr := range trs {
-		if tr._glob.Match(absRelPath) {
+		if tr.ParsedGlob.Match(absRelPath) {
 			return tr, true
 		}
 	}

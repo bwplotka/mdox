@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bwplotka/mdox/pkg/config"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/pkg/merrors"
 	"github.com/go-kit/kit/log"
@@ -112,7 +113,7 @@ func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
 type validator struct {
 	logger         log.Logger
 	anchorDir      string
-	validateConfig Config
+	validateConfig config.Config
 
 	localLinks  localLinksCache
 	rMu         sync.RWMutex
@@ -137,9 +138,9 @@ type futureResult struct {
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
 func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
 	var err error
-	config := Config{}
+	cfg := config.Config{}
 	if string(linksValidateConfig) != "" {
-		config, err = ParseConfig(linksValidateConfig)
+		cfg, err = config.ParseValidateConfig(linksValidateConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +148,7 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
-		validateConfig: config,
+		validateConfig: cfg,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
 		c:              colly.NewCollector(colly.Async()),
@@ -251,7 +252,7 @@ func (v *validator) visit(filepath string, dest string) {
 		}
 		return
 	}
-	validator := v.validateConfig.GetValidatorForURL(dest)
+	validator := GetValidatorForURL(dest, v.validateConfig)
 	if validator != nil {
 		matched, err := validator.IsValid(k, v)
 		if matched && err == nil {
