@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/efficientgo/tools/pkg/testutil"
+	"github.com/efficientgo/tools/core/pkg/testutil"
 )
 
 func TestValidateAnchorDir(t *testing.T) {

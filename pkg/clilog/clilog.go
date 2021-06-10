@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/efficientgo/tools/pkg/merrors"
+	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
 )
 
