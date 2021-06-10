@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/pkg/errcapture"
+	"github.com/efficientgo/tools/core/pkg/errcapture"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
@@ -346,7 +346,7 @@ func copyFiles(src, dst string) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "cpy source")
 	}
-	defer errcapture.Close(&err, source, "src close")
+	defer errcapture.ExhaustClose(&err, source, "src close")
 
 	if err := os.MkdirAll(filepath.Dir(dst), os.ModePerm); err != nil {
 		return err
@@ -356,7 +356,7 @@ func copyFiles(src, dst string) (err error) {
 	if err != nil {
 		return errors.Wrap(err, "cpy dest")
 	}
-	defer errcapture.Close(&err, destination, "dst close")
+	defer errcapture.ExhaustClose(&err, destination, "dst close")
 
 	_, err = io.Copy(destination, source)
 	return err
@@ -369,7 +369,7 @@ func popFirstHeader(path string) (_ string, rest []byte, err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer errcapture.Close(&err, file, "close file")
+	defer errcapture.ExhaustClose(&err, file, "close file")
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
