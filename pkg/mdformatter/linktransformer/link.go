@@ -11,8 +11,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/merrors"
@@ -33,6 +35,7 @@ var (
 
 const (
 	originalURLKey = "originalURLKey"
+	retryKey       = "retryKey"
 )
 
 type chain struct {
@@ -175,7 +178,30 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 	v.c.OnError(func(response *colly.Response, err error) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+		retriesStr := response.Ctx.Get(retryKey)
+		retries, _ := strconv.Atoi(retriesStr)
+		switch response.StatusCode {
+		case 429:
+			if retries <= 2 {
+				response.Ctx.Put(retryKey, strconv.Itoa(retries+1))
+				retryAfter, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
+				if convErr == nil {
+					time.Sleep(time.Duration(retryAfter) * time.Second)
+				}
+
+				retryErr := response.Request.Retry()
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(retryErr, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			}
+		case 301, 307, 503:
+			if retries <= 2 {
+				response.Ctx.Put(retryKey, strconv.Itoa(retries+1))
+
+				retryErr := response.Request.Retry()
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(retryErr, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			}
+		default:
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+		}
 	})
 	return v, nil
 }
