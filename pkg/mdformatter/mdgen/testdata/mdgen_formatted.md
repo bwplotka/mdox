@@ -4,10 +4,6 @@
 test output
 ```
 
-```yaml mdox-gen-lang="go" mdox-gen-type="github.com/bwplotka/mdox/pkg/mdox/testdata.Config"
-TO BE DONE
-```
-
 ```yaml
 abc
 sad
@@ -39,4 +35,9 @@ test output3
 #!/usr/bin/env bash
 
 echo "test output3"
+```
+
+```yaml mdox-exec="bash ./testdata/out2.sh --name=queryfrontend.InMemoryResponseCacheConfig"
+test output2
+newline
 ```

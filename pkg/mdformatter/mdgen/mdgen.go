@@ -5,7 +5,6 @@ package mdgen
 
 import (
 	"bytes"
-	"context"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -17,8 +16,6 @@ import (
 )
 
 const (
-	infoStringKeyLang     = "mdox-gen-lang"
-	infoStringKeyType     = "mdox-gen-type"
 	infoStringKeyExec     = "mdox-exec"
 	infoStringKeyExitCode = "mdox-expect-exit-code"
 )
@@ -40,19 +37,22 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	}
 	infoStringAttr := map[string]string{}
 	for i, field := range infoFiels {
-		val := strings.Split(field, "=")
+		val := []string{field}
+		if i := strings.Index(field, "="); i != -1 {
+			val = []string{field[:i], field[i+1:]}
+		}
 		if i == 0 && len(val) == 2 {
 			return nil, errors.Errorf("missing language info in fenced code block. Got info string %q", string(infoString))
 		}
 		switch val[0] {
-		case infoStringKeyExec, infoStringKeyExitCode:
+		case infoStringKeyExec:
 			if len(val) != 2 {
-				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyExitCode, infoStringKeyExec, string(infoString))
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %s=\"<value1>\" but got %s", val[0], infoStringKeyExec, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
-		case infoStringKeyLang, infoStringKeyType:
+		case infoStringKeyExitCode:
 			if len(val) != 2 {
-				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %q=<value2> %q=<value2>. Got info string %q", val[0], infoStringKeyLang, infoStringKeyType, string(infoString))
+				return nil, errors.Errorf("got %q without variable. Expected format is e.g ```yaml %s=\"<value1>\" but got %s", val[0], infoStringKeyExitCode, string(infoString))
 			}
 			infoStringAttr[val[0]] = val[1]
 		}
@@ -82,30 +82,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == expectedCode {
 				return b.Bytes(), nil
 			}
-			return nil, errors.Wrapf(err, "run %v", execCmd)
+			return nil, errors.Wrapf(err, "run %v, out: %v", execCmd, b.String())
 		}
 		return b.Bytes(), nil
 	}
 
-	lang, langOk := infoStringAttr[infoStringKeyLang]
-	typePath, typOk := infoStringAttr[infoStringKeyType]
-	if typOk || langOk {
-		if typOk != langOk {
-			return nil, errors.Errorf("got ambiguous attributes: %v. Expected is e.g ```yaml %q=<value> %q=go . Got info string %q", infoStringAttr, infoStringKeyType, infoStringKeyLang, string(infoString))
-		}
-		switch lang {
-		case "go", "golang":
-			return genGo(ctx, "", typePath)
-		default:
-			return nil, errors.Errorf("expected language a first element of info string got %q; Got info string %q", lang, string(infoString))
-		}
-	}
 	panic("should never get here")
 }
 
 func (t *genCodeBlockTransformer) Close(ctx mdformatter.SourceContext) error { return nil }
-
-func genGo(ctx context.Context, moduleRoot string, typePath string) ([]byte, error) {
-	// TODO(bwplotka): To be done.
-	return nil, nil
-}
