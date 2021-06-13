@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,8 +35,8 @@ var (
 )
 
 const (
-	originalURLKey = "originalURLKey"
-	retryKey       = "retryKey"
+	originalURLKey     = "originalURLKey"
+	numberOfRetriesKey = "retryKey"
 )
 
 type chain struct {
@@ -178,26 +179,36 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 	v.c.OnError(func(response *colly.Response, err error) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		retriesStr := response.Ctx.Get(retryKey)
+		retriesStr := response.Ctx.Get(numberOfRetriesKey)
 		retries, _ := strconv.Atoi(retriesStr)
 		switch response.StatusCode {
-		case 429:
-			if retries <= 2 {
-				response.Ctx.Put(retryKey, strconv.Itoa(retries+1))
+		case http.StatusTooManyRequests:
+			if retries <= 0 {
+				var retryAfter int
+				// Retry calls same methods as Visit and makes request with same options.
+				// So retryKey is incremented here if onError is called again after Retry. By default retries once.
+				response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
 				retryAfter, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
-				if convErr == nil {
-					time.Sleep(time.Duration(retryAfter) * time.Second)
+				if convErr != nil {
+					retryAfter = 1
 				}
+				time.Sleep(time.Duration(retryAfter) * time.Second)
 
-				retryErr := response.Request.Retry()
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(retryErr, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+				if retryErr := response.Request.Retry(); retryErr != nil {
+					v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+					break
+				}
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
 			}
-		case 301, 307, 503:
-			if retries <= 2 {
-				response.Ctx.Put(retryKey, strconv.Itoa(retries+1))
+		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable:
+			if retries <= 0 {
+				response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
 
-				retryErr := response.Request.Retry()
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(retryErr, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+				if retryErr := response.Request.Retry(); retryErr != nil {
+					v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+					break
+				}
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
 			}
 		default:
 			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
