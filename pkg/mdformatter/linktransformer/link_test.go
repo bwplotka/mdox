@@ -181,6 +181,28 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 	})
 
+	t.Run("check valid local links with dash", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links-with-dash.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# Expose UI on a sub-path
+
+[1](#expose-ui-on-a-sub-path)
+
+# Run-time deduplication of HA groups
+
+[2](#run-time-deduplication-of-ha-groups)
+`), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+	})
+
 	t.Run("check invalid local links", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
 		filePath := "/repo/docs/test/invalid-local-links.md"

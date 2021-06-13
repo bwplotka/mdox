@@ -127,7 +127,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
 	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
-	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.Config", extflag.WithEnvSubstitution())
+	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var opts []mdformatter.Option
