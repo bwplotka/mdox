@@ -6,10 +6,6 @@ a
 adf
 ```
 
-```yaml mdox-gen-lang="go" mdox-gen-type="github.com/bwplotka/mdox/pkg/mdox/testdata.Config"
-TO BE DONE
-```
-
 ```yaml
 abc
 sad
@@ -40,4 +36,7 @@ abc
 ```
 
 ```bash mdox-exec="sed -n '1,3p' ./testdata/out3.sh"
+```
+
+```yaml mdox-exec="bash ./testdata/out2.sh --name=queryfrontend.InMemoryResponseCacheConfig"
 ```
