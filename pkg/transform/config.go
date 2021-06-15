@@ -5,7 +5,6 @@ package transform
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,18 +113,6 @@ type FrontMatterConfig struct {
 	// This will override any existing font matter.1
 	// TODO(bwplotka): Add add only option?
 	Template string
-}
-
-func parseConfigFile(configFile string) (Config, error) {
-	configFile, err := filepath.Abs(configFile)
-	if err != nil {
-		return Config{}, errors.Wrap(err, "abs")
-	}
-	c, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return Config{}, errors.Wrap(err, "read config file")
-	}
-	return ParseConfig(c)
 }
 
 func ParseConfig(c []byte) (Config, error) {
