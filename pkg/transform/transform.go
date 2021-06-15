@@ -49,8 +49,8 @@ func prepOutputDir(d string, gitIgnored bool) error {
 }
 
 // Dir transforms directory using given configuration file.
-func Dir(ctx context.Context, logger log.Logger, configFile string) error {
-	c, err := parseConfigFile(configFile)
+func Dir(ctx context.Context, logger log.Logger, config []byte) error {
+	c, err := ParseConfig(config)
 	if err != nil {
 		return err
 	}

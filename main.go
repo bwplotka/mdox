@@ -209,9 +209,12 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 
 func registerTransform(_ context.Context, app *extkingpin.App) {
 	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
-	cfg := cmd.Flag("config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config").
-		Short('c').Default(".mdox.yaml").ExistingFile()
+	cfg := extflag.RegisterPathOrContent(cmd, "config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config", extflag.WithEnvSubstitution())
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
-		return transform.Dir(ctx, logger, *cfg)
+		validateConfig, err := cfg.Content()
+		if err != nil {
+			return err
+		}
+		return transform.Dir(ctx, logger, validateConfig)
 	})
 }
