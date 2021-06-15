@@ -351,7 +351,7 @@ func toHeaderID(header []byte) string {
 		switch h {
 		case '{':
 			return string(id)
-		case ' ':
+		case ' ', '-':
 			id = append(id, '-')
 		default:
 		}

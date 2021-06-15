@@ -58,6 +58,11 @@ docs: build ## Generates config snippets and doc formatting.
 	@echo ">> generating docs $(PATH)"
 	@PATH=$(GOBIN) mdox fmt -l *.md
 
+.PHONY: check-docs
+check-docs: build ## Checks docs for discrepancies in formatting and links.
+	@echo ">> checking formatting and links $(PATH)"
+	@PATH=$(GOBIN) mdox fmt --check -l *.md
+
 .PHONY: format
 format: ## Formats Go code.
 format: $(GOIMPORTS)
