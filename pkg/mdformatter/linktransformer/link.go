@@ -6,6 +6,7 @@ package linktransformer
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -139,7 +140,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -154,7 +155,7 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async()),
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
 		destFutures:    map[futureKey]*futureResult{},
 	}
 	// Set very soft limits.
@@ -183,33 +184,39 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 		retries, _ := strconv.Atoi(retriesStr)
 		switch response.StatusCode {
 		case http.StatusTooManyRequests:
-			if retries <= 0 {
-				var retryAfter int
-				// Retry calls same methods as Visit and makes request with same options.
-				// So retryKey is incremented here if onError is called again after Retry. By default retries once.
-				response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
-				retryAfter, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
-				if convErr != nil {
-					retryAfter = 1
-				}
-				time.Sleep(time.Duration(retryAfter) * time.Second)
-
-				if retryErr := response.Request.Retry(); retryErr != nil {
-					v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
-					break
-				}
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			if retries > 0 {
+				break
 			}
+			var retryAfterSeconds int
+			// Retry calls same methods as Visit and makes request with same options.
+			// So retryKey is incremented here if onError is called again after Retry. By default retries once.
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+			retryAfterSeconds, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
+			if convErr != nil {
+				retryAfterSeconds = 1
+			}
+			select {
+			case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
+			case <-v.c.Context.Done():
+				return
+			}
+
+			if retryErr := response.Request.Retry(); retryErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				break
+			}
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
 		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable:
-			if retries <= 0 {
-				response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
-
-				if retryErr := response.Request.Retry(); retryErr != nil {
-					v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
-					break
-				}
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			if retries > 0 {
+				break
 			}
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+
+			if retryErr := response.Request.Retry(); retryErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				break
+			}
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
 		default:
 			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
 		}
@@ -219,7 +226,7 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
 func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(logger, linksValidateConfig, anchorDir)
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir)
 	if err != nil {
 		panic(err)
 	}
