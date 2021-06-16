@@ -49,7 +49,7 @@ Following the [KISS]($$-https://en.wikipedia.org/wiki/KISS_principle-testdata/no
 
 See those components on this diagram:
 
-<img src="img/arch.jpg" class="img-fluid" alt="architecture overview" />
+<img src="$$-img/arch.jpg-testdata/not_formatted.md-$$" class="img-fluid" alt="architecture overview"/>
 
 ![img]($$-img/arch.jpg-testdata/not_formatted.md-$$)
 
@@ -226,6 +226,41 @@ The compactor is not in the critical path of querying or data backup. It can eit
 ### [Ruler/Rule]($$-components/rule.md-testdata/not_formatted.md-$$)
 
 In case of Prometheus with Thanos sidecar does not have enough retention, or if you want to have alerts or recording rules that requires global view, Thanos has just the component for that: the [Ruler]($$-components/rule.md-testdata/not_formatted.md-$$), which does rule and alert evaluation on top of a given Thanos Querier.
+
+<!--- TODO explain steps  --->
+
+<img src="$$-../img/go-in-thanos.jpg-testdata/not_formatted.md-$$" class="img-fluid" alt="Go in Thanos">
+
+<p align="center"><img src="$$-docs/img/Thanos-logo_fullmedium.png-testdata/not_formatted.md-$$" alt="Thanos Logo"></p>
+
+<table>
+<tbody>
+<tr><th>Avoid 🔥[Link](../docs/something.png)</th></tr>
+<tr><td>
+
+```go
+resp, err := http.Get("http://example.com/")
+if err != nil {
+    // handle...
+}
+defer runutil.CloseWithLogOnErr(logger, resp.Body, "close response")
+
+scanner := bufio.NewScanner(resp.Body)
+// If any error happens and we return in the middle of scanning
+// body, we can end up with unread buffer, which
+// will use memory and hold TCP connection!
+for scanner.Scan() {
+```
+
+</td></tr>
+<tr><th>Better 🤓</th></tr>
+</tbody>
+</table>
+
+<dsada
+
+<taasdav>
+</taasdav>
 
 ## Flags
 

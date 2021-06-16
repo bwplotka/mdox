@@ -11,6 +11,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
+	"golang.org/x/net/html"
 )
 
 type nopOpsRenderer struct {
@@ -40,7 +41,72 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 	if err := ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		var err error
 		switch typedNode := n.(type) {
-		// TODO(bwplotka): Add support for links inside HTML.
+		case *ast.HTMLBlock, *ast.RawHTML:
+			if !entering || t.link == nil {
+				return ast.WalkSkipChildren, nil
+			}
+
+			// Parse HTML to get inline links on our own, goldmark does not do that.
+			b := bytes.Buffer{}
+			if typedNode, ok := n.(*ast.RawHTML); ok {
+				for i := 0; i < typedNode.Segments.Len(); i++ {
+					segment := typedNode.Segments.At(i)
+					_, _ = b.Write(segment.Value(source))
+				}
+			} else {
+				// We switch this to string type so we need to accommodate newlines.
+				_, _ = b.WriteString("\n")
+				if n.HasBlankPreviousLines() {
+					_, _ = b.WriteString("\n")
+				}
+				for i := 0; i < n.Lines().Len(); i++ {
+					segment := n.Lines().At(i)
+					_, _ = b.Write(segment.Value(source))
+				}
+			}
+
+			var out string
+			z := html.NewTokenizer(&b)
+			for tt := z.Next(); tt != html.ErrorToken; tt = z.Next() {
+				token := z.Token()
+				switch token.Data {
+				case "img":
+					for i := range token.Attr {
+						if token.Attr[i].Key != "src" {
+							continue
+						}
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
+						if err != nil {
+							return ast.WalkStop, err
+						}
+						token.Attr[i].Val = string(dest)
+						break
+					}
+				case "a":
+					for i := range token.Attr {
+						if token.Attr[i].Key != "href" {
+							continue
+						}
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
+						if err != nil {
+							return ast.WalkStop, err
+						}
+						token.Attr[i].Val = string(dest)
+						break
+					}
+				}
+				out += token.String()
+			}
+			if err := z.Err(); err != nil && err != io.EOF {
+				return ast.WalkStop, err
+			}
+
+			repl := ast.NewString([]byte("\n" + out + "\n"))
+			repl.SetParent(n.Parent())
+			repl.SetPreviousSibling(n.PreviousSibling())
+			repl.SetNextSibling(n.NextSibling())
+			n.Parent().ReplaceChild(n.Parent(), n, repl)
+			n.SetNextSibling(repl.NextSibling()) // Make sure our loop can continue.
 		case *ast.Link:
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
@@ -63,6 +129,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			repl := ast.NewString(dest)
 			repl.SetParent(n)
 			n.Parent().ReplaceChild(n.Parent(), n, repl)
+			n.SetNextSibling(repl.NextSibling()) // Make sure our loop can continue.
+
 		case *ast.Image:
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
