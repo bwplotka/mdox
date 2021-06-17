@@ -69,7 +69,10 @@ type TransformationConfig struct {
 	Path string
 
 	// FrontMatter holds front matter transformations.
-	FrontMatter *FrontMatterConfig `yaml:"frontMatter"`
+	FrontMatter *MatterConfig `yaml:"frontMatter"`
+
+	// BackMatter holds back matter transformations.
+	BackMatter *MatterConfig `yaml:"backMatter"`
 }
 
 func (tr TransformationConfig) targetRelPath(relPath string) (_ string, err error) {
@@ -106,11 +109,11 @@ func (tr TransformationConfig) targetRelPath(relPath string) (_ string, err erro
 	return filepath.Join(targetDir, targetSuffix), nil
 }
 
-type FrontMatterConfig struct {
+type MatterConfig struct {
 	_template *template.Template
 
-	// Template represents Go template that will be rendered as font matter.
-	// This will override any existing font matter.1
+	// Template represents Go template that will be rendered as matter.
+	// This will override any existing matter.
 	// TODO(bwplotka): Add add only option?
 	Template string
 }
@@ -158,7 +161,14 @@ func ParseConfig(c []byte) (Config, error) {
 		if f.FrontMatter != nil {
 			f.FrontMatter._template, err = template.New("").Parse(f.FrontMatter.Template)
 			if err != nil {
-				return Config{}, errors.Wrapf(err, "compiling template %v", f.FrontMatter.Template)
+				return Config{}, errors.Wrapf(err, "compiling frontMatter template %v", f.FrontMatter.Template)
+			}
+		}
+
+		if f.BackMatter != nil {
+			f.BackMatter._template, err = template.New("").Parse(f.BackMatter.Template)
+			if err != nil {
+				return Config{}, errors.Wrapf(err, "compiling backMatter template %v", f.BackMatter.Template)
 			}
 		}
 	}

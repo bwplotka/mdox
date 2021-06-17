@@ -184,12 +184,30 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
 			localLinksStyle: t.c.LocalLinksStyle,
 			c:               tr.FrontMatter,
-			origin: FrontMatterOrigin{
+			origin: MatterOrigin{
 				Filename:    originFilename,
 				FirstHeader: firstHeader,
 				LastMod:     info.ModTime().String(),
 			},
-			target: FrontMatterTarget{
+			target: MatterTarget{
+				FileName: targetFilename,
+			},
+		}))
+	}
+
+	if tr.BackMatter != nil {
+		if !isMDFile(target) {
+			return errors.Errorf("back matter option set on file that after transformation is non-markdown: %v", target)
+		}
+		_, originFilename := filepath.Split(path)
+		_, targetFilename := filepath.Split(target)
+		opts = append(opts, mdformatter.WithBackMatterTransformer(&backMatterTransformer{
+			b: tr.BackMatter,
+			origin: MatterOrigin{
+				Filename: originFilename,
+				LastMod:  info.ModTime().String(),
+			},
+			target: MatterTarget{
 				FileName: targetFilename,
 			},
 		}))
@@ -276,28 +294,36 @@ func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil
 
 type frontMatterTransformer struct {
 	localLinksStyle LocalLinksStyle
-	c               *FrontMatterConfig
+	c               *MatterConfig
 
 	// Vars.
-	origin FrontMatterOrigin
-	target FrontMatterTarget
+	origin MatterOrigin
+	target MatterTarget
 }
 
-type FrontMatterOrigin struct {
+type backMatterTransformer struct {
+	b *MatterConfig
+
+	// Vars.
+	origin MatterOrigin
+	target MatterTarget
+}
+
+type MatterOrigin struct {
 	Filename    string
 	FirstHeader string
 	LastMod     string
 }
 
-type FrontMatterTarget struct {
+type MatterTarget struct {
 	FileName string
 }
 
 func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceContext, frontMatter map[string]interface{}) ([]byte, error) {
 	b := bytes.Buffer{}
 	if err := f.c._template.Execute(&b, struct {
-		Origin      FrontMatterOrigin
-		Target      FrontMatterTarget
+		Origin      MatterOrigin
+		Target      MatterTarget
 		FrontMatter map[string]interface{}
 	}{
 		Origin:      f.origin,
@@ -322,6 +348,29 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 }
 
 func (f *frontMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
+
+func (f *backMatterTransformer) TransformBackMatter(ctx mdformatter.SourceContext) ([]byte, error) {
+	b := bytes.Buffer{}
+	if err := f.b._template.Execute(&b, struct {
+		Origin MatterOrigin
+		Target MatterTarget
+	}{
+		Origin: f.origin,
+		Target: f.target,
+	}); err != nil {
+		return nil, err
+	}
+
+	// Add demarkation to back matter.
+	demark := "\n\n---\n"
+	m := b.Bytes()
+	m = append([]byte(demark), m...)
+
+	// Back matter is not parsed as YAML since it is generally assumed to be a block of text.
+	return m, nil
+}
+
+func (f *backMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 func firstMatch(absRelPath string, trs []*TransformationConfig) (*TransformationConfig, bool) {
 	for _, tr := range trs {
