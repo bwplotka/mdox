@@ -6,13 +6,17 @@ package linktransformer
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/merrors"
@@ -32,7 +36,8 @@ var (
 )
 
 const (
-	originalURLKey = "originalURLKey"
+	originalURLKey     = "originalURLKey"
+	numberOfRetriesKey = "retryKey"
 )
 
 type chain struct {
@@ -135,7 +140,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -150,7 +155,7 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async()),
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
 		destFutures:    map[futureKey]*futureResult{},
 	}
 	// Set very soft limits.
@@ -175,14 +180,53 @@ func NewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir strin
 	v.c.OnError(func(response *colly.Response, err error) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+		retriesStr := response.Ctx.Get(numberOfRetriesKey)
+		retries, _ := strconv.Atoi(retriesStr)
+		switch response.StatusCode {
+		case http.StatusTooManyRequests:
+			if retries > 0 {
+				break
+			}
+			var retryAfterSeconds int
+			// Retry calls same methods as Visit and makes request with same options.
+			// So retryKey is incremented here if onError is called again after Retry. By default retries once.
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+			retryAfterSeconds, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
+			if convErr != nil {
+				retryAfterSeconds = 1
+			}
+			select {
+			case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
+			case <-v.c.Context.Done():
+				return
+			}
+
+			if retryErr := response.Request.Retry(); retryErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				break
+			}
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable:
+			if retries > 0 {
+				break
+			}
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+
+			if retryErr := response.Request.Retry(); retryErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				break
+			}
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+		default:
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+		}
 	})
 	return v, nil
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
 func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(logger, linksValidateConfig, anchorDir)
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir)
 	if err != nil {
 		panic(err)
 	}

@@ -156,7 +156,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if err != nil {
 				return err
 			}
-			v, err := linktransformer.NewValidator(logger, validateConfigContent, anchorDir)
+			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir)
 			if err != nil {
 				return err
 			}
