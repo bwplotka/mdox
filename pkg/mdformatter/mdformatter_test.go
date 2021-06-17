@@ -91,6 +91,7 @@ func TestFormat_FormatSingle_Transformers(t *testing.T) {
 	t.Run("Format not formatted", func(t *testing.T) {
 		buf := bytes.Buffer{}
 		testutil.Ok(t, f.Format(file, &buf))
+
 		testutil.Equals(t, string(exp), buf.String())
 	})
 

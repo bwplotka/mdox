@@ -115,7 +115,7 @@
 
  ### [Compactor](components/compact.md)
 
-@@ -226,8 +218,4 @@
+@@ -226,5 +218,3 @@
 
  The compactor is not in the critical path of querying or data backup. It can either be run as a periodic batch job or be left running to always compact data as soon as possible. It is recommended to provide 100-300GB of local disk space for data processing.
 
@@ -132,15 +132,17 @@
 -
 +In case of Prometheus with Thanos sidecar does not have enough retention, or if you want to have alerts or recording rules that requires global view, Thanos has just the component for that: the [Ruler](components/rule.md), which does rule and alert evaluation on top of a given Thanos Querier.
 
--
+ <!--- TODO explain steps  --->
+
+@@ -273,1 +263,0 @@
+
  ## Flags
--
+
 -[embedmd]:# (flags/rule.txt $)
-+
  ```$
  usage: thanos rule [<flags>]
 
-@@ -414,1 +402,0 @@
+@@ -448,1 +437,0 @@
 
  The configuration format is the following:
 
@@ -148,7 +150,7 @@
  ```yaml
  alertmanagers:
  - http_config:
-@@ -440,1 +427,4 @@
+@@ -474,1 +462,4 @@
    timeout: 10s
    api_version: v1
  ```

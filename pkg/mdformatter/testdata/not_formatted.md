@@ -237,6 +237,40 @@ In case of Prometheus with Thanos sidecar does not have enough retention, or if 
 which does rule and alert evaluation on top of a given Thanos Querier.
 
 
+<!--- TODO explain steps  --->
+
+<img src="../img/go-in-thanos.jpg" class="img-fluid" alt="Go in Thanos" >
+
+<p align="center"><img src="docs/img/Thanos-logo_fullmedium.png" alt="Thanos Logo"></p>
+
+<table>
+<tbody>
+<tr><th>Avoid 🔥[Link](../docs/something.png)</th></tr>
+<tr><td>
+
+```go
+resp, err := http.Get("http://example.com/")
+if err != nil {
+    // handle...
+}
+defer runutil.CloseWithLogOnErr(logger, resp.Body, "close response")
+
+scanner := bufio.NewScanner(resp.Body)
+// If any error happens and we return in the middle of scanning
+// body, we can end up with unread buffer, which
+// will use memory and hold TCP connection!
+for scanner.Scan() {
+```
+
+</td></tr>
+<tr><th>Better 🤓</th></tr>
+</tbody>
+</table>
+
+<dsada
+
+<taasdav>
+</taasdav>
 
 ## Flags
 
