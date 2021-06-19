@@ -225,10 +225,10 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.NotOk(t, err)
 
 		testutil.Equals(t, fmt.Sprintf("%v: 4 errors: "+
-			"%v: link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
-			"%v: link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
-			"%v: link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
-			"%v: link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
+			"%v:3: link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
+			"%v:3: link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
+			"%v:3: link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
+			"%v:3: link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
 			tmpDir+filePath, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir), err.Error())
 	})
 
@@ -249,7 +249,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
+		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
 	})
 
 	t.Run("check valid & 404 link with validate config", func(t *testing.T) {

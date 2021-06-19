@@ -6,6 +6,8 @@ package mdformatter
 import (
 	"bytes"
 	"io"
+	"regexp"
+	"strconv"
 
 	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/yuin/goldmark/ast"
@@ -29,8 +31,9 @@ type transformer struct {
 
 	sourceCtx SourceContext
 
-	link LinkTransformer
-	cb   CodeBlockTransformer
+	link           LinkTransformer
+	cb             CodeBlockTransformer
+	frontMatterLen int
 }
 
 func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
@@ -75,7 +78,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 						if token.Attr[i].Key != "src" {
 							continue
 						}
-						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
+						lines := getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val), lines)
 						if err != nil {
 							return ast.WalkStop, err
 						}
@@ -87,7 +91,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 						if token.Attr[i].Key != "href" {
 							continue
 						}
-						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
+						lines := getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val), lines)
 						if err != nil {
 							return ast.WalkStop, err
 						}
@@ -111,7 +116,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
+			lines := getLinkLines(source, typedNode.Destination, t.frontMatterLen)
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination, lines)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -119,7 +125,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil || typedNode.AutoLinkType != ast.AutoLinkURL {
 				return ast.WalkSkipChildren, nil
 			}
-			dest, err := t.link.TransformDestination(t.sourceCtx, typedNode.URL(source))
+			lines := getLinkLines(source, typedNode.URL(source), t.frontMatterLen)
+			dest, err := t.link.TransformDestination(t.sourceCtx, typedNode.URL(source), lines)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -135,7 +142,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
+			lines := getLinkLines(source, typedNode.Destination, t.frontMatterLen)
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination, lines)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -177,4 +185,29 @@ func replaceContent(b *ast.BaseBlock, lastSegmentStop int, content []byte) {
 	// NOTE(bwplotka): This feels like hack, because we pack all lines in single line. But it works (:
 	s.Append(text.NewSegment(lastSegmentStop, lastSegmentStop+len(content)))
 	b.SetLines(s)
+}
+
+// getLinkLines returns line numbers in source where link is present.
+func getLinkLines(source []byte, link []byte, lenfm int) string {
+	var targetLines string
+	sourceLines := bytes.Split(source, []byte("\n"))
+	// frontMatter is present so would need to account for `---` lines.
+	if lenfm > 0 {
+		lenfm += 2
+	}
+	// Using regex, as two links may have same host but diff params. Same in case of local links.
+	linkRe := regexp.MustCompile(`(^|[^/\-~&=#?@%a-zA-Z0-9])` + string(link) + `($|[^/\-~&=#?@%a-zA-Z0-9])`)
+	for i, line := range sourceLines {
+		if linkRe.Match(line) {
+			// Easier to just return int slice, but then cannot use it in futureKey.
+			// https://golang.org/ref/spec#Map_types.
+			add := strconv.Itoa(i + 1 + lenfm)
+			if targetLines != "" {
+				add = "," + strconv.Itoa(i+1+lenfm)
+			}
+			targetLines += add
+		}
+	}
+	// If same link is found multiple times returns string like *,*,*...
+	return targetLines
 }

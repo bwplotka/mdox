@@ -59,7 +59,7 @@ type mockLinkTransformer struct {
 	closed bool
 }
 
-func (*mockLinkTransformer) TransformDestination(ctx SourceContext, destination []byte) ([]byte, error) {
+func (*mockLinkTransformer) TransformDestination(ctx SourceContext, destination []byte, _ string) ([]byte, error) {
 	if bytes.HasPrefix(destination, []byte("$$-")) {
 		return destination, nil
 	}

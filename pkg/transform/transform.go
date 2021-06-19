@@ -211,7 +211,7 @@ type relLinkTransformer struct {
 	newRelPath map[string]string
 }
 
-func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) ([]byte, error) {
+func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte, _ string) ([]byte, error) {
 	split := strings.Split(string(destination), "#")
 	relDest := split[0]
 	if strings.Contains(relDest, "://") || filepath.IsAbs(relDest) || strings.HasPrefix(string(destination), "#") {

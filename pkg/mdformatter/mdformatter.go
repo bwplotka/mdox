@@ -36,7 +36,7 @@ type FrontMatterTransformer interface {
 }
 
 type LinkTransformer interface {
-	TransformDestination(ctx SourceContext, destination []byte) ([]byte, error)
+	TransformDestination(ctx SourceContext, destination []byte, lines string) ([]byte, error)
 	Close(ctx SourceContext) error
 }
 
@@ -283,6 +283,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		wrapped:   markdown.NewRenderer(),
 		sourceCtx: sourceCtx,
 		link:      f.link, cb: f.cb,
+		frontMatterLen: len(frontMatter),
 	}
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),

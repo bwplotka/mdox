@@ -48,9 +48,9 @@ func NewChain(c ...mdformatter.LinkTransformer) mdformatter.LinkTransformer {
 	return &chain{chain: c}
 }
 
-func (l *chain) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
+func (l *chain) TransformDestination(ctx mdformatter.SourceContext, destination []byte, lines string) (_ []byte, err error) {
 	for _, c := range l.chain {
-		destination, err = c.TransformDestination(ctx, destination)
+		destination, err = c.TransformDestination(ctx, destination, lines)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func NewLocalizer(logger log.Logger, address *regexp.Regexp, anchorDir string) m
 	return &localizer{logger: logger, address: address, anchorDir: anchorDir, localLinksByFile: map[string]*[]string{}}
 }
 
-func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
+func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destination []byte, _ string) (_ []byte, err error) {
 	matches := remoteLinkPrefixRe.FindAllIndex(destination, 1)
 	if matches != nil {
 		// URLs. Remove http/https prefix.
@@ -129,7 +129,7 @@ type validator struct {
 }
 
 type futureKey struct {
-	filepath, dest string
+	filepath, dest, lines string
 }
 
 type futureResult struct {
@@ -233,8 +233,8 @@ func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir s
 	return v
 }
 
-func (v *validator) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
-	v.visit(ctx.Filepath, string(destination))
+func (v *validator) TransformDestination(ctx mdformatter.SourceContext, destination []byte, lines string) (_ []byte, err error) {
+	v.visit(ctx.Filepath, string(destination), lines)
 	return destination, nil
 }
 
@@ -266,19 +266,19 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 		f := v.destFutures[k]
 		if err := f.resultFn(); err != nil {
 			if f.cases == 1 {
-				merr.Add(errors.Wrapf(err, "%v", path))
+				merr.Add(errors.Wrapf(err, "%v:%v", path, k.lines))
 				continue
 			}
-			merr.Add(errors.Wrapf(err, "%v (%v occurrences)", path, f.cases))
+			merr.Add(errors.Wrapf(err, "%v:%v (%v occurrences)", path, k.lines, f.cases))
 		}
 	}
 	return merr.Err()
 }
 
-func (v *validator) visit(filepath string, dest string) {
+func (v *validator) visit(filepath string, dest string, lines string) {
 	v.futureMu.Lock()
 	defer v.futureMu.Unlock()
-	k := futureKey{filepath: filepath, dest: dest}
+	k := futureKey{filepath: filepath, dest: dest, lines: lines}
 	if _, ok := v.destFutures[k]; ok {
 		v.destFutures[k].cases++
 		return
