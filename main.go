@@ -19,6 +19,7 @@ import (
 	"github.com/bwplotka/mdox/pkg/mdformatter/mdgen"
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/bwplotka/mdox/pkg/version"
+	"github.com/charmbracelet/glamour"
 	extflag "github.com/efficientgo/tools/extkingpin"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -178,7 +179,19 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if len(diff) == 0 {
 				return nil
 			}
-			return errors.Errorf("files not formatted: %v", diff.String())
+			grender, err := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(100),
+			)
+			if err != nil {
+				return err
+			}
+			diffOut, err := grender.Render("\n```diff\n" + diff.String() + "\n```\n")
+			if err != nil {
+				return err
+			}
+			return errors.Errorf("files not formatted: %v", diffOut)
+
 		}
 		return mdformatter.Format(ctx, logger, *files, opts...)
 	})

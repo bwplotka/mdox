@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
@@ -17,7 +18,9 @@ import (
 	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
+	"github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
+	"github.com/theckman/yacspin"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -178,24 +181,58 @@ func (d Diffs) String() string {
 	return b.String()
 }
 
+func newSpinner(suffix string) (*yacspin.Spinner, error) {
+	cfg := yacspin.Config{
+		Frequency: 100 * time.Millisecond,
+		CharSet:   yacspin.CharSets[11],
+		Suffix:    suffix,
+		ColorAll:  true,
+		Writer:    os.Stderr,
+		Colors:    []string{"cyan", "bold"},
+	}
+
+	spin, err := yacspin.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		return spin, nil
+	}
+	return nil, nil
+}
+
 // Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
 func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
-	return format(ctx, logger, files, nil, opts...)
+	spin, err := newSpinner(" Formatting: ")
+	if err != nil {
+		return err
+	}
+	return format(ctx, logger, files, nil, spin, opts...)
 }
 
 // IsFormatted tries to formats given markdown files and return Diff if files are not formatted.
 // If diff is empty it means all files are formatted.
 func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ...Option) (diffs Diffs, err error) {
 	d := Diffs{}
-	if err := format(ctx, logger, files, &d, opts...); err != nil {
+	spin, err := newSpinner(" Checking: ")
+	if err != nil {
+		return nil, err
+	}
+	if err := format(ctx, logger, files, &d, spin, opts...); err != nil {
 		return nil, err
 	}
 	return d, nil
 }
 
-func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, opts ...Option) error {
+func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, opts ...Option) error {
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
+	if spin != nil {
+		err := spin.Start()
+		if err != nil {
+			return err
+		}
+	}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
 
 	errs := merrors.New()
@@ -204,6 +241,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+		}
+		if spin != nil {
+			spin.Message(fn + "...")
 		}
 		errs.Add(func() error {
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
@@ -239,6 +279,12 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			}
 			return file.Truncate(int64(n))
 		}())
+	}
+	if spin != nil {
+		err := spin.Stop()
+		if err != nil {
+			errs.Add(err)
+		}
 	}
 	return errs.Err()
 }
