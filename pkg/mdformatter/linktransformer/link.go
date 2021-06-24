@@ -387,17 +387,24 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 
 func toHeaderID(header []byte) string {
 	var id []byte
+	// Remove punctuation from header except '-' or '#'.
+	// '\p{L}\p{N}\p{M}' is the unicode equivalent of '\w', https://www.regular-expressions.info/unicode.html.
+	punctuation := regexp.MustCompile(`[^\p{L}\p{N}\p{M}-# ]`)
+	header = punctuation.ReplaceAll(header, []byte(""))
+	headerText := bytes.TrimLeft(bytes.ToLower(header), "#")
+	// If header is just punctuation it comes up empty. So cannot be linked.
+	if len(headerText) <= 1 {
+		return ""
+	}
 
-	for _, h := range bytes.TrimLeft(bytes.ToLower(header), "#")[1:] {
-		if (h >= 97 && h <= 122) || (h >= 48 && h <= 57) {
-			id = append(id, h)
-		}
+	for _, h := range headerText[1:] {
 		switch h {
 		case '{':
 			return string(id)
 		case ' ', '-':
 			id = append(id, '-')
 		default:
+			id = append(id, h)
 		}
 	}
 	return string(id)
