@@ -35,6 +35,11 @@ type FrontMatterTransformer interface {
 	Close(ctx SourceContext) error
 }
 
+type BackMatterTransformer interface {
+	TransformBackMatter(ctx SourceContext) ([]byte, error)
+	Close(ctx SourceContext) error
+}
+
 type LinkTransformer interface {
 	TransformDestination(ctx SourceContext, destination []byte) ([]byte, error)
 	Close(ctx SourceContext) error
@@ -49,6 +54,7 @@ type Formatter struct {
 	ctx context.Context
 
 	fm   FrontMatterTransformer
+	bm   BackMatterTransformer
 	link LinkTransformer
 	cb   CodeBlockTransformer
 }
@@ -60,6 +66,13 @@ type Option func(*Formatter)
 func WithFrontMatterTransformer(fm FrontMatterTransformer) Option {
 	return func(m *Formatter) {
 		m.fm = fm
+	}
+}
+
+// WithBackMatterTransformer allows you to override the default BackMatterTransformer.
+func WithBackMatterTransformer(bm BackMatterTransformer) Option {
+	return func(m *Formatter) {
+		m.bm = bm
 	}
 }
 
@@ -271,6 +284,18 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		if _, err := out.Write(hdr); err != nil {
 			return err
 		}
+		if err := f.fm.Close(sourceCtx); err != nil {
+			return err
+		}
+	}
+
+	if f.bm != nil {
+		back, err := f.bm.TransformBackMatter(sourceCtx)
+		if err != nil {
+			return err
+		}
+
+		content = append(content, back...)
 		if err := f.fm.Close(sourceCtx); err != nil {
 			return err
 		}
