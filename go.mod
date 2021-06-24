@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/efficientgo/tools/core v0.0.0-20210609125236-d73259166f20
 	github.com/efficientgo/tools/extkingpin v0.0.0-20210609125236-d73259166f20
+	github.com/felixge/fgprof v0.9.1 // indirect
 	github.com/go-kit/kit v0.10.0
 	github.com/gobwas/glob v0.2.3
 	github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0

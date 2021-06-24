@@ -20,7 +20,10 @@ import (
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/bwplotka/mdox/pkg/version"
 	"github.com/charmbracelet/glamour"
+	"github.com/efficientgo/tools/core/pkg/errcapture"
+	"github.com/efficientgo/tools/core/pkg/logerrcapture"
 	extflag "github.com/efficientgo/tools/extkingpin"
+	"github.com/felixge/fgprof"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
@@ -66,6 +69,7 @@ func main() {
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use.").
 		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
+	profilesPath := app.Flag("debug.profiles", "WHAT THE HECK ARE YOU DOING SO LONG").Hidden().String()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app)
@@ -73,6 +77,15 @@ func main() {
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
+
+	if *profilesPath != "" {
+		finalize, err := snapshotProfiles(*profilesPath)
+		if err != nil {
+			level.Error(logger).Log("err", errors.Wrapf(err, "%s profiles init failed", cmd))
+			os.Exit(1)
+		}
+		defer logerrcapture.Do(logger, finalize, "profiles")
+	}
 
 	var g run.Group
 	g.Add(func() error {
@@ -103,6 +116,23 @@ func main() {
 	}
 }
 
+func snapshotProfiles(dir string) (func() error, error) {
+	// TODO: now -> date
+	if err := os.MkdirAll(filepath.Join(dir, "now"), os.ModePerm); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "now", "fgprof.pprof"), os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	fgFunc := fgprof.Start(f, fgprof.FormatPprof)
+
+	return func() (err error) {
+		defer errcapture.Do(&err, f.Close, "close")
+		return fgFunc()
+	}, nil
+}
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
