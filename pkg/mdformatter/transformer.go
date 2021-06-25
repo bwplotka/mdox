@@ -78,8 +78,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 						if token.Attr[i].Key != "src" {
 							continue
 						}
-						lines := getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
-						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val), lines)
+						t.sourceCtx.LineNumbers = getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
 						if err != nil {
 							return ast.WalkStop, err
 						}
@@ -91,8 +91,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 						if token.Attr[i].Key != "href" {
 							continue
 						}
-						lines := getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
-						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val), lines)
+						t.sourceCtx.LineNumbers = getLinkLines(source, []byte(token.Attr[i].Val), t.frontMatterLen)
+						dest, err := t.link.TransformDestination(t.sourceCtx, []byte(token.Attr[i].Val))
 						if err != nil {
 							return ast.WalkStop, err
 						}
@@ -116,8 +116,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			lines := getLinkLines(source, typedNode.Destination, t.frontMatterLen)
-			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination, lines)
+			t.sourceCtx.LineNumbers = getLinkLines(source, typedNode.Destination, t.frontMatterLen)
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -125,8 +125,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil || typedNode.AutoLinkType != ast.AutoLinkURL {
 				return ast.WalkSkipChildren, nil
 			}
-			lines := getLinkLines(source, typedNode.URL(source), t.frontMatterLen)
-			dest, err := t.link.TransformDestination(t.sourceCtx, typedNode.URL(source), lines)
+			t.sourceCtx.LineNumbers = getLinkLines(source, typedNode.URL(source), t.frontMatterLen)
+			dest, err := t.link.TransformDestination(t.sourceCtx, typedNode.URL(source))
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -142,8 +142,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.link == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			lines := getLinkLines(source, typedNode.Destination, t.frontMatterLen)
-			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination, lines)
+			t.sourceCtx.LineNumbers = getLinkLines(source, typedNode.Destination, t.frontMatterLen)
+			typedNode.Destination, err = t.link.TransformDestination(t.sourceCtx, typedNode.Destination)
 			if err != nil {
 				return ast.WalkStop, err
 			}

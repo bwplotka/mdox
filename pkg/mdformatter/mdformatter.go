@@ -27,7 +27,8 @@ import (
 type SourceContext struct {
 	context.Context
 
-	Filepath string
+	Filepath    string
+	LineNumbers string
 }
 
 type FrontMatterTransformer interface {
@@ -36,7 +37,7 @@ type FrontMatterTransformer interface {
 }
 
 type LinkTransformer interface {
-	TransformDestination(ctx SourceContext, destination []byte, lines string) ([]byte, error)
+	TransformDestination(ctx SourceContext, destination []byte) ([]byte, error)
 	Close(ctx SourceContext) error
 }
 
