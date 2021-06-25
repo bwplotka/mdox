@@ -392,7 +392,7 @@ func toHeaderID(header []byte) string {
 	punctuation := regexp.MustCompile(`[^\p{L}\p{N}\p{M}-# ]`)
 	header = punctuation.ReplaceAll(header, []byte(""))
 	headerText := bytes.TrimLeft(bytes.ToLower(header), "#")
-	// If header is just punctuation it comes up empty. So cannot be linked.
+	// If header is just punctuation it comes up empty, so it cannot be linked.
 	if len(headerText) <= 1 {
 		return ""
 	}
