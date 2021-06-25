@@ -227,15 +227,12 @@ func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ..
 func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, opts ...Option) error {
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
-	if spin != nil {
-		err := spin.Start()
-		if err != nil {
-			return err
-		}
-	}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
 
 	errs := merrors.New()
+	if spin != nil {
+		errs.Add(spin.Start())
+	}
 	for _, fn := range files {
 		select {
 		case <-ctx.Done():
@@ -281,10 +278,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 		}())
 	}
 	if spin != nil {
-		err := spin.Stop()
-		if err != nil {
-			errs.Add(err)
-		}
+		errs.Add(spin.Stop())
 	}
 	return errs.Err()
 }
