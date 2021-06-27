@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
@@ -177,6 +179,7 @@ type validator struct {
 	rMu         sync.RWMutex
 	remoteLinks map[string]error
 	c           *colly.Collector
+	storage     *cache.Storage
 
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
@@ -197,7 +200,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -208,7 +211,6 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
-	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx))
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
@@ -231,7 +233,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              collector,
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		storage:        storage,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
 		transportFn: func(u string) http.RoundTripper {
@@ -254,6 +257,13 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	// on api (only search is below 100).
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
+	}
+
+	if v.storage != nil {
+		err = v.c.SetStorage(v.storage)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	limitRule := &colly.LimitRule{
@@ -282,6 +292,20 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	v.c.OnError(func(response *colly.Response, err error) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
+		// Colly stores requests in cache, even when they have errors.
+		// So need to delete requests with errors from cache database.
+		if v.storage != nil {
+			h := fnv.New64a()
+			_, writeErr := h.Write([]byte(response.Ctx.Get(originalURLKey)))
+			if writeErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(writeErr, "%q could not build requestID %v", response.Request.URL.String(), response.StatusCode)
+			}
+			delErr := v.storage.DeleteRequest(h.Sum64())
+			if delErr != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(delErr, "%q could not delete from cache %v", response.Request.URL.String(), response.StatusCode)
+			}
+		}
+
 		retriesStr := response.Ctx.Get(numberOfRetriesKey)
 		retries, _ := strconv.Atoi(retriesStr)
 		switch response.StatusCode {
@@ -328,8 +352,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, nil)
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.Storage) mdformatter.LinkTransformer {
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, storage, nil)
 	if err != nil {
 		panic(err)
 	}
