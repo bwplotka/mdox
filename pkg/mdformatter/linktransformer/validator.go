@@ -60,7 +60,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.c.WithTransport(r.transportFn(k.dest))
 	if r.storage != nil {
 		// Check if URL is already in cache database.
-		if ok, err := r.c.HasVisited(k.dest); ok && err == nil {
+		if ok, err := r.storage.IsCached(k.dest); ok && err == nil {
 			return true, nil
 		}
 	}

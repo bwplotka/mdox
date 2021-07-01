@@ -82,10 +82,6 @@ Flags:
                                  flag (mutually exclusive). Content of YAML file
                                  for skipping link check, with spec defined in
                                  github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
-      --no-cache                 If true, link checking will not create local
-                                 SQLite cache file
-      --cache.validity=120h      Duration till which link in cache is considered
-                                 valid
       --cache.clear              If true, entire cache database will be dropped
 
 Args:

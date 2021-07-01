@@ -213,9 +213,6 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
 
-	cacheDisabled := cmd.Flag("no-cache", "If true, link checking will not create local SQLite cache file").Bool()
-	// Default validity is for 5 days.
-	cacheValidity := cmd.Flag("cache.validity", "Duration till which link in cache is considered valid").Default("120h").Duration()
 	clearCache := cmd.Flag("cache.clear", "If true, entire cache database will be dropped").Bool()
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
@@ -256,13 +253,9 @@ This directive runs executable with arguments and put its stderr and stdout outp
 				return err
 			}
 
-			storage = nil
-			if !*cacheDisabled {
-				storage = &cache.Storage{
-					Filename:   cacheFile,
-					Validity:   *cacheValidity,
-					ClearCache: *clearCache,
-				}
+			storage = &cache.Storage{
+				Filename:   cacheFile,
+				ClearCache: *clearCache,
 			}
 
 			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir, storage, reg)

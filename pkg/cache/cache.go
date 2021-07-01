@@ -5,7 +5,6 @@ package cache
 
 import (
 	"database/sql"
-	"net/url"
 	"sync"
 	"time"
 
@@ -40,20 +39,18 @@ func (s *Storage) Init() error {
 			return errors.Wrap(err, "unable to open cache database file")
 		}
 
-		err = database.Ping()
-		if err != nil {
+		if err = database.Ping(); err != nil {
 			return errors.Wrap(err, "verify connection to cache database")
 		}
 		s.dbHandle = database
 	}
 	if s.ClearCache {
-		err := s.Clear()
-		if err != nil {
+		if err := s.Clear(); err != nil {
 			return err
 		}
 	}
 	// Create db with index.
-	statement, err := s.dbHandle.Prepare("CREATE TABLE IF NOT EXISTS visited (id INTEGER PRIMARY KEY, requestID INTEGER, visited INT, timestamp DATETIME)")
+	statement, err := s.dbHandle.Prepare("CREATE TABLE IF NOT EXISTS visited (id INTEGER PRIMARY KEY, url TEXT, visited INT, timestamp DATETIME)")
 	if err != nil {
 		return err
 	}
@@ -61,7 +58,7 @@ func (s *Storage) Init() error {
 	if err != nil {
 		return err
 	}
-	statement, err = s.dbHandle.Prepare("CREATE INDEX IF NOT EXISTS idx_visited ON visited (requestID)")
+	statement, err = s.dbHandle.Prepare("CREATE INDEX IF NOT EXISTS idx_visited ON visited (url)")
 	if err != nil {
 		return err
 	}
@@ -89,41 +86,38 @@ func (s *Storage) Clear() error {
 
 // Close cache database.
 func (s *Storage) Close() error {
-	err := s.dbHandle.Close()
-	return err
+	return s.dbHandle.Close()
 }
 
-// Visited inserts new URL to cache database.
-func (s *Storage) Visited(requestID uint64) error {
+// CacheURL inserts new URL into cache database.
+func (s *Storage) CacheURL(URL string) error {
 	// If particular URL is already inserted, then delete.
 	// Visit method will only be called if validity expires for a URL or in case of a new URL.
-	err := s.DeleteRequest(requestID)
-	if err != nil {
+	if err := s.DeleteURL(URL); err != nil {
 		return err
 	}
 
 	// Insert with current UTC Unix timestamp.
-	statement, err := s.dbHandle.Prepare("INSERT INTO visited (requestID, visited, timestamp) VALUES (?, 1, strftime('%s', 'now'))")
+	statement, err := s.dbHandle.Prepare("INSERT INTO visited (url, visited, timestamp) VALUES (?, 1, strftime('%s', 'now'))")
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec(int64(requestID))
+	_, err = statement.Exec(URL)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// IsVisited checks if URL has already been visited.
-func (s *Storage) IsVisited(requestID uint64) (bool, error) {
+// IsCached checks if URL has already been visited.
+func (s *Storage) IsCached(URL string) (bool, error) {
 	var timestamp time.Time
-	statement, err := s.dbHandle.Prepare("SELECT timestamp FROM visited where requestId = ?")
+	statement, err := s.dbHandle.Prepare("SELECT timestamp FROM visited where url = ?")
 	if err != nil {
 		return false, err
 	}
-	row := statement.QueryRow(int64(requestID))
-	err = row.Scan(&timestamp)
-	if err != nil {
+	row := statement.QueryRow(URL)
+	if err = row.Scan(&timestamp); err != nil {
 		// If ErrNoRows then it means URL is new, so need to call Visited.
 		if err == sql.ErrNoRows {
 			return false, nil
@@ -132,29 +126,18 @@ func (s *Storage) IsVisited(requestID uint64) (bool, error) {
 	}
 
 	// Check if URL is within validity threshold.
-	now := time.Now().UTC()
-	if !timestamp.IsZero() && now.Sub(timestamp) <= s.Validity {
-		return true, nil
-	}
-	return false, nil
+	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp) <= s.Validity), nil
 }
 
-// DeleteRequest deletes a request from cache database.
-func (s *Storage) DeleteRequest(requestID uint64) error {
-	statement, err := s.dbHandle.Prepare("DELETE FROM visited where requestId = ?")
+// DeleteURL deletes a URL from cache database.
+func (s *Storage) DeleteURL(URL string) error {
+	statement, err := s.dbHandle.Prepare("DELETE FROM visited where url = ?")
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec(int64(requestID))
+	_, err = statement.Exec(URL)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-// Cookie methods are not implemented, as saving cookies is not a requirement for link caching.
-func (s *Storage) SetCookies(u *url.URL, cookies string) {}
-
-func (s *Storage) Cookies(u *url.URL) string {
-	return ""
 }

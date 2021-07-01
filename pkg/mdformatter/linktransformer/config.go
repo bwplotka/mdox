@@ -20,6 +20,9 @@ import (
 type Config struct {
 	Version int
 
+	NoCache       bool          `yaml:"noCache"`
+	CacheValidity time.Duration `yaml:"cacheValidity"`
+
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
 	Validators              []ValidatorConfig `yaml:"validators"`
 	Timeout                 string            `yaml:"timeout"`
@@ -76,7 +79,11 @@ type GitHubResponse struct {
 }
 
 func ParseConfig(c []byte) (Config, error) {
-	cfg := Config{}
+	defaultValidity, err := time.ParseDuration("120h")
+	if err != nil {
+		return Config{}, errors.Wrapf(err, "parsing default validity %q", string(c))
+	}
+	cfg := Config{CacheValidity: defaultValidity}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
@@ -104,7 +111,7 @@ func ParseConfig(c []byte) (Config, error) {
 	}
 
 	if len(cfg.Validators) <= 0 {
-		return Config{}, errors.New("No validator provided")
+		return cfg, nil
 	}
 
 	// Evaluate regex for given validators.
