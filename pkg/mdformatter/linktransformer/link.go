@@ -129,7 +129,7 @@ type validator struct {
 }
 
 type futureKey struct {
-	filepath, dest string
+	filepath, dest, lineNumbers string
 }
 
 type futureResult struct {
@@ -234,7 +234,7 @@ func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir s
 }
 
 func (v *validator) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
-	v.visit(ctx.Filepath, string(destination))
+	v.visit(ctx.Filepath, string(destination), ctx.LineNumbers)
 	return destination, nil
 }
 
@@ -266,19 +266,19 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 		f := v.destFutures[k]
 		if err := f.resultFn(); err != nil {
 			if f.cases == 1 {
-				merr.Add(errors.Wrapf(err, "%v", path))
+				merr.Add(errors.Wrapf(err, "%v:%v", path, k.lineNumbers))
 				continue
 			}
-			merr.Add(errors.Wrapf(err, "%v (%v occurrences)", path, f.cases))
+			merr.Add(errors.Wrapf(err, "%v:%v (%v occurrences)", path, k.lineNumbers, f.cases))
 		}
 	}
 	return merr.Err()
 }
 
-func (v *validator) visit(filepath string, dest string) {
+func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.futureMu.Lock()
 	defer v.futureMu.Unlock()
-	k := futureKey{filepath: filepath, dest: dest}
+	k := futureKey{filepath: filepath, dest: dest, lineNumbers: lineNumbers}
 	if _, ok := v.destFutures[k]; ok {
 		v.destFutures[k].cases++
 		return

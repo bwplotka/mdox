@@ -30,7 +30,8 @@ import (
 type SourceContext struct {
 	context.Context
 
-	Filepath string
+	Filepath    string
+	LineNumbers string
 }
 
 type FrontMatterTransformer interface {
@@ -348,6 +349,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		wrapped:   markdown.NewRenderer(),
 		sourceCtx: sourceCtx,
 		link:      f.link, cb: f.cb,
+		frontMatterLen: len(frontMatter),
 	}
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
