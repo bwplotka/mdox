@@ -3,7 +3,7 @@ module github.com/bwplotka/mdox
 go 1.15
 
 require (
-	github.com/Kunde21/markdownfmt/v2 v2.1.0
+	github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210622145915-e6bf3dcd02de
 	github.com/antchfx/xmlquery v1.3.4 // indirect
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/efficientgo/tools/core v0.0.0-20210609125236-d73259166f20
@@ -29,6 +29,3 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )
-
-// TODO(bwplotka): Remove when https://github.com/Kunde21/markdownfmt/pull/35 is merged.
-replace github.com/Kunde21/markdownfmt/v2 => github.com/bwplotka/markdownfmt/v2 v2.0.0-20210616121647-559e77044d46
