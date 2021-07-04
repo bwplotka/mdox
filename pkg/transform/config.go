@@ -68,6 +68,10 @@ type TransformationConfig struct {
 	// TODO(bwplotka): Explain ** and * suffixes and ability to specify "invalid" paths like "/../".
 	Path string
 
+	// Add is an optional path for a file to be created with certain frontMatter.
+	// Only parses frontMatter and cannot be mentioned alongside path and glob.
+	AddPath string `yaml:"addPath"`
+
 	// FrontMatter holds front matter transformations.
 	FrontMatter *MatterConfig `yaml:"frontMatter"`
 
@@ -153,9 +157,17 @@ func ParseConfig(c []byte) (Config, error) {
 	cfg.OutputDir = strings.TrimSuffix(cfg.OutputDir, "/")
 
 	for _, f := range cfg.Transformations {
-		f._glob, err = glob.Compile(f.Glob, '/')
-		if err != nil {
-			return Config{}, errors.Wrapf(err, "compiling glob %v", f.Glob)
+		if f.Glob != "" {
+			f._glob, err = glob.Compile(f.Glob, '/')
+			if err != nil {
+				return Config{}, errors.Wrapf(err, "compiling glob %v", f.Glob)
+			}
+		}
+
+		if f.AddPath != "" {
+			if f.Path != "" || f._glob != nil {
+				return Config{}, errors.Wrapf(err, "addPath with glob or path %v, %v, %v", f.AddPath, f.Path, f.Glob)
+			}
 		}
 
 		if f.FrontMatter != nil {

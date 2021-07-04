@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/errcapture"
@@ -48,6 +49,46 @@ func prepOutputDir(d string, gitIgnored bool) error {
 	return nil
 }
 
+func createNewFiles(ctx context.Context, trs []*TransformationConfig, outputDir string, logger log.Logger) error {
+	for _, tr := range trs {
+		if tr.AddPath == "" {
+			continue
+		}
+		msg := "creating new file"
+		target := filepath.Join(outputDir, tr.AddPath)
+		_, err := os.Create(target)
+		if err != nil {
+			return errors.Wrapf(err, "creating new file %v", target)
+		}
+
+		var opts []mdformatter.Option
+		if tr.FrontMatter != nil {
+			if !isMDFile(target) {
+				return errors.Errorf("front matter option set on file that is non-markdown: %v", target)
+			}
+			msg = "creating new file with transformation"
+
+			_, targetFilename := filepath.Split(target)
+			opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
+				c: tr.FrontMatter,
+				origin: MatterOrigin{
+					LastMod: time.Now().String(),
+				},
+				target: MatterTarget{
+					FileName: targetFilename,
+				},
+			}))
+		}
+		level.Debug(logger).Log("msg", msg, "target", target)
+
+		err = mdformatter.Format(ctx, logger, []string{target}, opts...)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Dir transforms directory using given configuration file.
 func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 	c, err := ParseConfig(config)
@@ -56,6 +97,10 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 	}
 
 	if err := prepOutputDir(c.OutputDir, c.GitIgnored); err != nil {
+		return err
+	}
+
+	if err = createNewFiles(ctx, c.Transformations, c.OutputDir, logger); err != nil {
 		return err
 	}
 
@@ -374,8 +419,10 @@ func (f *backMatterTransformer) Close(mdformatter.SourceContext) error { return 
 
 func firstMatch(absRelPath string, trs []*TransformationConfig) (*TransformationConfig, bool) {
 	for _, tr := range trs {
-		if tr._glob.Match(absRelPath) {
-			return tr, true
+		if tr._glob != nil {
+			if tr._glob.Match(absRelPath) {
+				return tr, true
+			}
 		}
 	}
 	return nil, false
