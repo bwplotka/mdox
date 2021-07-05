@@ -8,6 +8,7 @@ gitIgnored: true
 transformations:
   - glob: "README.md"
     path: _index.md
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
@@ -18,6 +19,7 @@ transformations:
             path: "/**"
 
   - glob: "**/README.md"
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
