@@ -171,7 +171,19 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 			return errors.Errorf("front matter option set on file that after transformation is non-markdown: %v", target)
 		}
 
-		firstHeader, rest, err := getFirstHeader(path, tr.PopHeader)
+		dir, file := filepath.Split(path)
+		// Remove trailing slash after split and check if root file.
+		if dir[:len(dir)-1] == t.c.InputDir && isMDFile(file) && tr.PopHeader == nil {
+			// Default popHeader to true for inputDir root file.
+			tr.PopHeader = func() *bool { b := true; return &b }()
+		}
+
+		// If unset and not root file.
+		if tr.PopHeader == nil {
+			tr.PopHeader = func() *bool { b := false; return &b }()
+		}
+
+		firstHeader, rest, err := getFirstHeader(path, *tr.PopHeader)
 		if err != nil {
 			return errors.Wrap(err, "read first header")
 		}

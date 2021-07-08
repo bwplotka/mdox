@@ -68,7 +68,7 @@ type TransformationConfig struct {
 	// TODO(bwplotka): Explain ** and * suffixes and ability to specify "invalid" paths like "/../".
 	Path string
 
-	PopHeader bool `yaml:"popHeader"`
+	PopHeader *bool `yaml:"popHeader"`
 
 	// FrontMatter holds front matter transformations.
 	FrontMatter *MatterConfig `yaml:"frontMatter"`
