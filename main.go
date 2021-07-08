@@ -6,9 +6,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"syscall"
 
@@ -28,6 +31,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -36,6 +41,10 @@ const (
 	logFormatJson   = "json"
 	logFormatCLILog = "clilog"
 )
+
+type mdoxMetrics struct {
+	reg *prometheus.Registry
+}
 
 func setupLogger(logLevel, logFormat string) log.Logger {
 	var lvl level.Option
@@ -69,10 +78,14 @@ func main() {
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use.").
 		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
-	profilesPath := app.Flag("debug.profiles", "WHAT THE HECK ARE YOU DOING SO LONG").Hidden().String()
+	// Profiling and metrics.
+	profilesPath := app.Flag("debug.profiles", "Path to which CPU and heap profiles are saved").Hidden().String()
+	metrics := app.Flag("metrics", "Enable metrics and view them at https://localhost:9091/metrics").Hidden().Bool()
+
+	m := &mdoxMetrics{reg: nil}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	registerFmt(ctx, app)
+	registerFmt(ctx, app, m)
 	registerTransform(ctx, app)
 
 	cmd, runner := app.Parse()
@@ -95,6 +108,19 @@ func main() {
 		cancel()
 	})
 
+	if *metrics {
+		srv := &http.Server{Addr: ":9091"}
+		m.reg = prometheus.NewRegistry()
+
+		g.Add(func() error {
+			http.Handle("/metrics", promhttp.HandlerFor(m.reg, promhttp.HandlerOpts{}))
+			return srv.ListenAndServe()
+		}, func(err error) {
+			_ = srv.Shutdown(ctx)
+			cancel()
+		})
+	}
+
 	// Listen for termination signals.
 	{
 		cancel := make(chan struct{})
@@ -114,6 +140,7 @@ func main() {
 		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
 		os.Exit(1)
 	}
+
 }
 
 func snapshotProfiles(dir string) (func() error, error) {
@@ -121,8 +148,18 @@ func snapshotProfiles(dir string) (func() error, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "now"), os.ModePerm); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "now", "fgprof.pprof"), os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	f, err := os.OpenFile(filepath.Join(dir, "now", "fgprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
 	if err != nil {
+		return nil, err
+	}
+
+	m, err := os.OpenFile(filepath.Join(dir, "now", "memprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	runtime.GC()
+
+	if err := pprof.WriteHeapProfile(m); err != nil {
 		return nil, err
 	}
 
@@ -133,6 +170,7 @@ func snapshotProfiles(dir string) (func() error, error) {
 		return fgFunc()
 	}, nil
 }
+
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
@@ -145,7 +183,7 @@ func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	}
 }
 
-func registerFmt(_ context.Context, app *extkingpin.App) {
+func registerFmt(_ context.Context, app *extkingpin.App, m *mdoxMetrics) {
 	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
@@ -187,7 +225,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if err != nil {
 				return err
 			}
-			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir)
+			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir, m.reg)
 			if err != nil {
 				return err
 			}
@@ -202,7 +240,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 
 		if *checkOnly {
-			diff, err := mdformatter.IsFormatted(ctx, logger, *files, opts...)
+			diff, err := mdformatter.IsFormatted(ctx, logger, *files, m.reg, opts...)
 			if err != nil {
 				return err
 			}
@@ -223,7 +261,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			return errors.Errorf("files not formatted: %v", diffOut)
 
 		}
-		return mdformatter.Format(ctx, logger, *files, opts...)
+		return mdformatter.Format(ctx, logger, *files, m.reg, opts...)
 	})
 }
 

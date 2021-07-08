@@ -18,6 +18,9 @@ type Validator interface {
 func (v GitHubValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	// Find rightmost index of match i.e, where regex match ends.
 	// This will be where issue/PR number starts. Split incase of section link and convert to int.
+	if r.l != nil {
+		r.l.githubSkippedLinks.Inc()
+	}
 	rightmostIndex := v._regex.FindStringIndex(k.dest)
 	stringNum := strings.Split(k.dest[rightmostIndex[1]:], "#")
 	num, err := strconv.Atoi(stringNum[0])
@@ -34,6 +37,9 @@ func (v GitHubValidator) IsValid(k futureKey, r *validator) (bool, error) {
 // RoundTripValidator.IsValid returns true if url is checked by colly.
 func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	// Result will be in future.
+	if r.l != nil {
+		r.l.roundTripLinks.Inc()
+	}
 	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }
 	r.rMu.RLock()
 	if _, ok := r.remoteLinks[k.dest]; ok {
@@ -49,6 +55,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 		return true, nil
 	}
 
+	r.c.WithTransport(r.transportFn(k.dest))
 	if err := r.c.Visit(k.dest); err != nil {
 		r.remoteLinks[k.dest] = errors.Wrapf(err, "remote link %v", k.dest)
 		return false, nil
@@ -58,6 +65,9 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 
 // IgnoreValidator.IsValid returns true if matched so that link in not checked.
 func (v IgnoreValidator) IsValid(k futureKey, r *validator) (bool, error) {
+	if r.l != nil {
+		r.l.ignoreSkippedLinks.Inc()
+	}
 	return true, nil
 }
 

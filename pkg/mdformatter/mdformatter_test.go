@@ -42,12 +42,12 @@ func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 }
 
 func TestCheck_NoTransformers(t *testing.T) {
-	diff, err := IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/formatted.md"})
+	diff, err := IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/formatted.md"}, nil)
 	testutil.Ok(t, err)
 	testutil.Equals(t, 0, len(diff))
 	testutil.Equals(t, "files the same; no diff", diff.String())
 
-	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted.md"})
+	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted.md"}, nil)
 	testutil.Ok(t, err)
 
 	exp, err := ioutil.ReadFile("testdata/not_formatted.md.diff")

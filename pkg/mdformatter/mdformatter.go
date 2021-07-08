@@ -20,12 +20,33 @@ import (
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/theckman/yacspin"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"gopkg.in/yaml.v3"
 )
+
+type mdformatterMetrics struct {
+	filesProcessed prometheus.Counter
+	perFileLatency *prometheus.HistogramVec
+}
+
+func newMdformatterMetrics(reg *prometheus.Registry) *mdformatterMetrics {
+	m := &mdformatterMetrics{}
+	m.filesProcessed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_processed_files_total",
+		Help: "The total number of processed files",
+	})
+	m.perFileLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{Name: "mdox_per_file_latency", Buckets: prometheus.DefBuckets},
+		[]string{"filepath"},
+	)
+
+	reg.MustRegister(m.filesProcessed, m.perFileLatency)
+	return m
+}
 
 type SourceContext struct {
 	context.Context
@@ -216,33 +237,36 @@ func newSpinner(suffix string) (*yacspin.Spinner, error) {
 }
 
 // Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
-func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
+func Format(ctx context.Context, logger log.Logger, files []string, reg *prometheus.Registry, opts ...Option) error {
 	spin, err := newSpinner(" Formatting: ")
 	if err != nil {
 		return err
 	}
-	return format(ctx, logger, files, nil, spin, opts...)
+	return format(ctx, logger, files, nil, spin, reg, opts...)
 }
 
 // IsFormatted tries to formats given markdown files and return Diff if files are not formatted.
 // If diff is empty it means all files are formatted.
-func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ...Option) (diffs Diffs, err error) {
+func IsFormatted(ctx context.Context, logger log.Logger, files []string, reg *prometheus.Registry, opts ...Option) (diffs Diffs, err error) {
 	d := Diffs{}
 	spin, err := newSpinner(" Checking: ")
 	if err != nil {
 		return nil, err
 	}
-	if err := format(ctx, logger, files, &d, spin, opts...); err != nil {
+	if err := format(ctx, logger, files, &d, spin, reg, opts...); err != nil {
 		return nil, err
 	}
 	return d, nil
 }
 
-func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, opts ...Option) error {
+func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, reg *prometheus.Registry, opts ...Option) error {
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
-
+	var m *mdformatterMetrics
+	if reg != nil {
+		m = newMdformatterMetrics(reg)
+	}
 	errs := merrors.New()
 	if spin != nil {
 		errs.Add(spin.Start())
@@ -257,6 +281,11 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			spin.Message(fn + "...")
 		}
 		errs.Add(func() error {
+			var start_time time.Time
+			if reg != nil {
+				start_time = time.Now()
+				m.filesProcessed.Inc()
+			}
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
 				return errors.Wrapf(err, "open %v", fn)
@@ -287,6 +316,10 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			n, err := file.WriteAt(b.Bytes(), 0)
 			if err != nil {
 				return errors.Wrapf(err, "write %v", fn)
+			}
+			if reg != nil {
+				time_taken := time.Since(start_time)
+				m.perFileLatency.WithLabelValues(fn).Observe(time_taken.Seconds())
 			}
 			return file.Truncate(int64(n))
 		}())
