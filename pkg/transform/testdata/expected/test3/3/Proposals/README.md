@@ -4,6 +4,8 @@ slug: README.md
 lastmod: 'TODO: Allow testing last mod .Origin.LastMod'
 ---
 
+# Proposals
+
 [RelLink](../_index.md)
 
 [RelLink](../Team/doc.md)

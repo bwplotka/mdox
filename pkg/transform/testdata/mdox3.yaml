@@ -35,6 +35,7 @@ transformations:
 
 
   - glob: "**.md"
+    popHeader: true
     backMatter:
       template: |
         Found a typo, inconsistency or missing information in our docs?
