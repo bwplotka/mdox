@@ -313,7 +313,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka\\/mdox'\n    token: '"+repoToken+"'\n    type: 'github'\n"), anchorDir),
+			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: '(^http[s]?:\\/\\/)(www\\.)?(github\\.com\\/)bwplotka\\/mdox(\\/pull\\/|\\/issues\\/)'\n    token: '"+repoToken+"'\n    type: 'githubPullsIssues'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
 	})
