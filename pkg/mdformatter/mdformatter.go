@@ -44,7 +44,9 @@ func newMdformatterMetrics(reg *prometheus.Registry) *mdformatterMetrics {
 		[]string{"filepath"},
 	)
 
-	reg.MustRegister(m.filesProcessed, m.perFileLatency)
+	if reg != nil {
+		reg.MustRegister(m.filesProcessed, m.perFileLatency)
+	}
 	return m
 }
 
@@ -263,10 +265,8 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
-	var m *mdformatterMetrics
-	if reg != nil {
-		m = newMdformatterMetrics(reg)
-	}
+	m := newMdformatterMetrics(reg)
+
 	errs := merrors.New()
 	if spin != nil {
 		errs.Add(spin.Start())
@@ -281,11 +281,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			spin.Message(fn + "...")
 		}
 		errs.Add(func() error {
-			var start_time time.Time
-			if reg != nil {
-				start_time = time.Now()
-				m.filesProcessed.Inc()
-			}
+			start_time := time.Now()
+			m.filesProcessed.Inc()
+
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
 				return errors.Wrapf(err, "open %v", fn)
@@ -317,10 +315,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			if err != nil {
 				return errors.Wrapf(err, "write %v", fn)
 			}
-			if reg != nil {
-				time_taken := time.Since(start_time)
-				m.perFileLatency.WithLabelValues(fn).Observe(time_taken.Seconds())
-			}
+			time_taken := time.Since(start_time)
+			m.perFileLatency.WithLabelValues(fn).Observe(time_taken.Seconds())
+
 			return file.Truncate(int64(n))
 		}())
 	}

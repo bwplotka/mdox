@@ -82,7 +82,9 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 		[]string{"domain"},
 	)
 
-	reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
+	if reg != nil {
+		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
+	}
 	return l
 }
 
@@ -212,24 +214,22 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		remoteLinks:    map[string]error{},
 		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
 		destFutures:    map[futureKey]*futureResult{},
-		l:              nil,
+		l:              &linktransformerMetrics{},
 		transportFn: func(url string) http.RoundTripper {
 			return http.DefaultTransport
 		},
 	}
 
-	if reg != nil {
-		v.l = newLinktransformerMetrics(reg)
-		v.transportFn = func(u string) http.RoundTripper {
-			parsed, err := url.Parse(u)
-			if err != nil {
-				panic(err)
-			}
-			return promhttp.InstrumentRoundTripperCounter(
-				v.l.collyRequests,
-				promhttp.InstrumentRoundTripperDuration(v.l.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}), http.DefaultTransport),
-			)
+	v.l = newLinktransformerMetrics(reg)
+	v.transportFn = func(u string) http.RoundTripper {
+		parsed, err := url.Parse(u)
+		if err != nil {
+			panic(err)
 		}
+		return promhttp.InstrumentRoundTripperCounter(
+			v.l.collyRequests,
+			promhttp.InstrumentRoundTripperDuration(v.l.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}), http.DefaultTransport),
+		)
 	}
 
 	// Set very soft limits.
@@ -299,8 +299,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string, reg *prometheus.Registry) mdformatter.LinkTransformer {
-	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, reg)
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -360,9 +360,8 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
-		if v.l != nil {
-			v.l.localLinksChecked.Inc()
-		}
+		v.l.localLinksChecked.Inc()
+
 		// Relative or absolute path. Check if exists.
 		newDest := absLocalLink(v.anchorDir, filepath, dest)
 
@@ -372,9 +371,8 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 		}
 		return
 	}
-	if v.l != nil {
-		v.l.remoteLinksChecked.Inc()
-	}
+	v.l.remoteLinksChecked.Inc()
+
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {
 		matched, err := validator.IsValid(k, v)

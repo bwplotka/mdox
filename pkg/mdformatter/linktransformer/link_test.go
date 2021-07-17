@@ -140,7 +140,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -157,7 +157,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -175,7 +175,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -197,7 +197,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -219,7 +219,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
@@ -242,7 +242,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
 
@@ -268,7 +268,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
 		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
@@ -283,7 +283,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka'\n    type: 'ignore'\n"), anchorDir, nil),
+			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka'\n    type: 'ignore'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
 	})
@@ -297,7 +297,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: '(^http[s]?:\\/\\/)(www\\.)?(fakelink[0-9]\\.com\\/)'\n    type: 'ignore'\n"), anchorDir, nil),
+			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: '(^http[s]?:\\/\\/)(www\\.)?(fakelink[0-9]\\.com\\/)'\n    type: 'ignore'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
 	})
@@ -313,7 +313,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka\\/mdox'\n    token: '"+repoToken+"'\n    type: 'github'\n"), anchorDir, nil),
+			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka\\/mdox'\n    token: '"+repoToken+"'\n    type: 'github'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
 	})

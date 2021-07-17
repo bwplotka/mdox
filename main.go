@@ -14,6 +14,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
@@ -33,6 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -82,7 +84,7 @@ func main() {
 	profilesPath := app.Flag("debug.profiles", "Path to which CPU and heap profiles are saved").Hidden().String()
 	metrics := app.Flag("metrics", "Enable metrics and view them at https://localhost:9091/metrics").Hidden().Bool()
 
-	m := &mdoxMetrics{reg: nil}
+	m := &mdoxMetrics{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	registerFmt(ctx, app, m)
@@ -144,16 +146,16 @@ func main() {
 }
 
 func snapshotProfiles(dir string) (func() error, error) {
-	// TODO: now -> date
-	if err := os.MkdirAll(filepath.Join(dir, "now"), os.ModePerm); err != nil {
+	now := time.Now().UTC()
+	if err := os.MkdirAll(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_")), os.ModePerm); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "now", "fgprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	f, err := os.OpenFile(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "fgprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := os.OpenFile(filepath.Join(dir, "now", "memprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	m, err := os.OpenFile(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "memprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +171,22 @@ func snapshotProfiles(dir string) (func() error, error) {
 		defer errcapture.Do(&err, f.Close, "close")
 		return fgFunc()
 	}, nil
+}
+
+func (m *mdoxMetrics) Print() error {
+	mfs, err := m.reg.Gather()
+	if err != nil {
+		return err
+	}
+
+	enc := expfmt.NewEncoder(os.Stdout, expfmt.FmtProtoText)
+
+	for _, mf := range mfs {
+		if err := enc.Encode(mf); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
@@ -199,6 +217,10 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
+		if m.reg != nil {
+			defer logerrcapture.Do(logger, m.Print, "print")
+		}
+
 		var opts []mdformatter.Option
 		if !*disableGenCodeBlocksDirectives {
 			opts = append(opts, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
