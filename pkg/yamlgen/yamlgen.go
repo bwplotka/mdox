@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -56,18 +58,42 @@ func GenGoCode(src []byte) (string, error) {
 				// Cast to `type struct`.
 				structDecl := typeDecl.Type.(*ast.StructType)
 				fields := structDecl.Fields.List
+				arrayInit := make(jen.Dict)
+
 				// Loop and generate fields for each field.
 				for _, field := range fields {
 					// Each field might have multiple names.
 					names := field.Names
 					for _, n := range names {
-						pos := n.Obj.Decl.(*ast.Field)
-						structFields = append(structFields, jen.Id(n.Name).Id(string(src[pos.Type.Pos()-1:pos.Type.End()-1])).Id(string(src[pos.Tag.Pos()-1:pos.Tag.End()-1])))
+						if n.IsExported() {
+							pos := n.Obj.Decl.(*ast.Field)
+
+							// Make type map to check if field is array.
+							info := types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
+							_, err = (&types.Config{Importer: importer.ForCompiler(fset, "source", nil)}).Check("mypkg", fset, []*ast.File{f}, &info)
+							if err != nil {
+								return "", err
+							}
+							typ := info.Types[field.Type].Type
+
+							switch typ.(type) {
+							case *types.Slice:
+								// Field is of type array so initialize it using code like `[]Type{Type{}}`.
+								arrayInit[jen.Id(n.Name)] = jen.Id(string(src[pos.Type.Pos()-1 : pos.Type.End()-1])).Values(jen.Id(string(src[pos.Type.Pos()+1 : pos.Type.End()-1])).Values())
+							default:
+							}
+							// Copy struct field to generated code.
+							if pos.Tag != nil {
+								structFields = append(structFields, jen.Id(n.Name).Id(string(src[pos.Type.Pos()-1:pos.Type.End()-1])).Id(pos.Tag.Value))
+							}
+						}
 					}
 				}
 
-				// Add initialize statements for struct.
-				init = append(init, jen.Id("configs").Index(jen.Lit(typeDecl.Name.Name)).Op("=").Id(typeDecl.Name.Name+"{}"))
+				// Add initialize statements for struct via code like `configs["Type"] = Type{}`.
+				// If struct has array members, use array initializer via code like `configs["Config"] = Config{ArrayMember: []Type{Type{}}}`.
+				init = append(init, jen.Id("configs").Index(jen.Lit(typeDecl.Name.Name)).Op("=").Id(typeDecl.Name.Name).Values(arrayInit))
+
 				// Finally put struct inside generated code.
 				generatedCode.Type().Id(typeDecl.Name.Name).Struct(structFields...)
 			}
