@@ -34,7 +34,11 @@ func (v GitHubValidator) IsValid(k futureKey, r *validator) (bool, error) {
 // RoundTripValidator.IsValid returns true if url is checked by colly.
 func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	// Result will be in future.
-	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }
+	prevResult, _ := r.destFutures.LoadAndDelete(k)
+	newResult := prevResult.(*futureResult)
+	newResult.resultFn = func() error { return r.remoteLinks[k.dest] }
+	r.destFutures.Store(k, newResult)
+
 	r.rMu.RLock()
 	if _, ok := r.remoteLinks[k.dest]; ok {
 		r.rMu.RUnlock()
