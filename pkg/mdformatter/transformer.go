@@ -196,7 +196,7 @@ func getLinkLines(source []byte, link []byte, lenfm int) string {
 		lenfm += 2
 	}
 	// Using regex, as two links may have same host but diff params. Same in case of local links.
-	linkRe := regexp.MustCompile(`(^|[^/\-~&=#?@%a-zA-Z0-9])` + string(link) + `($|[^/\-~&=#?@%a-zA-Z0-9])`)
+	linkRe := regexp.MustCompile(`(^|[^/\-~&=#?@%a-zA-Z0-9])` + regexp.QuoteMeta(string(link)) + `($|[^/\-~&=#?@%a-zA-Z0-9])`)
 	for i, line := range sourceLines {
 		if linkRe.Match(line) {
 			// Easier to just return int slice, but then cannot use it in futureKey.

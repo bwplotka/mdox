@@ -256,7 +256,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check 404 link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists\n"), os.ModePerm))
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\n"), os.ModePerm))
 		filePath := "/repo/docs/test/invalid-link.md"
 		wdir, err := os.Getwd()
 		testutil.Ok(t, err)
@@ -271,7 +271,9 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
+		testutil.Equals(t, fmt.Sprintf("%v: 2 errors: "+
+			"%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible; status code 0: Get \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\": dial tcp: lookup docs.gfoogle.com: no such host; "+
+			"%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir+filePath, relDirPath+filePath, relDirPath+filePath), err.Error())
 	})
 
 	t.Run("check valid & 404 link with validate config", func(t *testing.T) {
