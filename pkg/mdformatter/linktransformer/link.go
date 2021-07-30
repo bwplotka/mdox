@@ -288,12 +288,11 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
 		// Check if link is email address.
-		if strings.HasPrefix(dest, "mailto:") {
-			email := strings.Split(dest, "mailto:")
-			if checkEmail(strings.TrimSpace(email[1])) {
+		if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
+			if isValidEmail(email) {
 				return
 			}
-			v.destFutures[k].resultFn = func() error { return errors.New("email not valid " + dest) }
+			v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", dest) }
 			return
 		}
 
@@ -315,8 +314,8 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	}
 }
 
-// checkEmail checks email structure and domain.
-func checkEmail(email string) bool {
+// isValidEmail checks email structure and domain.
+func isValidEmail(email string) bool {
 	// Check length.
 	if len(email) < 3 && len(email) > 254 {
 		return false

@@ -286,7 +286,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
-		testutil.Equals(t, fmt.Sprintf("%v: "+"%v:1: email not valid mailto:test@mdox.com", tmpDir+filePath, relDirPath+filePath), err.Error())
+		testutil.Equals(t, fmt.Sprintf("%v: "+"%v:1: provided mailto link is not a valid email, got mailto:test@mdox.com", tmpDir+filePath, relDirPath+filePath), err.Error())
 	})
 
 	t.Run("check 404 link", func(t *testing.T) {
