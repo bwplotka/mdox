@@ -254,6 +254,41 @@ func TestValidator_TransformDestination(t *testing.T) {
 			tmpDir+filePath, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir), err.Error())
 	})
 
+	t.Run("check valid email link", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-email.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("[yolo](mailto:test@yahoo.com)\n"), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+	})
+
+	t.Run("check invalid email link", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-email.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("[yolo](mailto:test@mdox.com)\n"), os.ModePerm))
+		filePath := "/repo/docs/test/invalid-email.md"
+		wdir, err := os.Getwd()
+		testutil.Ok(t, err)
+		relDirPath, err := filepath.Rel(wdir, tmpDir)
+		testutil.Ok(t, err)
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir),
+		))
+		testutil.NotOk(t, err)
+		testutil.Equals(t, fmt.Sprintf("%v: "+"%v:1: provided mailto link is not a valid email, got mailto:test@mdox.com", tmpDir+filePath, relDirPath+filePath), err.Error())
+	})
+
 	t.Run("check 404 link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\n"), os.ModePerm))

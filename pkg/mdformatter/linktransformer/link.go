@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -286,6 +287,15 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
+		// Check if link is email address.
+		if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
+			if isValidEmail(email) {
+				return
+			}
+			v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", dest) }
+			return
+		}
+
 		// Relative or absolute path. Check if exists.
 		newDest := absLocalLink(v.anchorDir, filepath, dest)
 
@@ -302,6 +312,26 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 			return
 		}
 	}
+}
+
+// isValidEmail checks email structure and domain.
+func isValidEmail(email string) bool {
+	// Check length.
+	if len(email) < 3 && len(email) > 254 {
+		return false
+	}
+	// Regex from https://www.w3.org/TR/2016/REC-html51-20161101/sec-forms.html#email-state-typeemail.
+	var emailRe = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	if !emailRe.MatchString(email) {
+		return false
+	}
+	// Check email domain.
+	domain := strings.Split(email, "@")
+	mx, err := net.LookupMX(domain[1])
+	if err != nil || len(mx) == 0 {
+		return false
+	}
+	return true
 }
 
 type localLinksCache map[string]*[]string
