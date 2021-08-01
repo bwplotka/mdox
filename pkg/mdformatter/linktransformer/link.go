@@ -162,6 +162,9 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
 	// on api (only search is below 100).
+	if config.Timeout != "" {
+		v.c.SetRequestTimeout(config.timeout)
+	}
 	if err := v.c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: 100,
