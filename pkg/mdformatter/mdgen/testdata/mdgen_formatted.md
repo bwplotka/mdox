@@ -41,3 +41,10 @@ echo "test output3"
 test output2
 newline
 ```
+
+```bash mdox-exec="cat ./testdata/out3.sh"
+#!/usr/bin/env bash
+
+echo "test output3"
+exit 2
+```

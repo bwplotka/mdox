@@ -84,7 +84,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 			}
 			return nil, errors.Wrapf(err, "run %v, out: %v", execCmd, b.String())
 		}
-		return b.Bytes(), nil
+		output := b.Bytes()
+		// Add newline to output if not present.
+		if !bytes.HasSuffix(output, []byte("\n")) {
+			output = append(output, []byte("\n")...)
+		}
+		return output, nil
 	}
 
 	panic("should never get here")
