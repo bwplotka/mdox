@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -16,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 
 	"github.com/dave/jennifer/jen"
 	"github.com/pkg/errors"
@@ -56,7 +56,11 @@ func GenGoCode(src []byte) (string, error) {
 			if typeDecl, ok := genericDecl.Specs[0].(*ast.TypeSpec); ok {
 				var structFields []jen.Code
 				// Cast to `type struct`.
-				structDecl := typeDecl.Type.(*ast.StructType)
+				structDecl, ok := typeDecl.Type.(*ast.StructType)
+				if !ok {
+					generatedCode.Type().Id(typeDecl.Name.Name).Id(string(src[typeDecl.Type.Pos()-1 : typeDecl.Type.End()-1]))
+					continue
+				}
 				fields := structDecl.Fields.List
 				arrayInit := make(jen.Dict)
 
@@ -68,20 +72,12 @@ func GenGoCode(src []byte) (string, error) {
 						if n.IsExported() {
 							pos := n.Obj.Decl.(*ast.Field)
 
-							// Make type map to check if field is array.
-							info := types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
-							_, err = (&types.Config{Importer: importer.ForCompiler(fset, "source", nil)}).Check("mypkg", fset, []*ast.File{f}, &info)
-							if err != nil {
-								return "", err
-							}
-							typ := info.Types[field.Type].Type
-
-							switch typ.(type) {
-							case *types.Slice:
-								// Field is of type array so initialize it using code like `[]Type{Type{}}`.
+							// Check if field is a slice type.
+							sliceRe := regexp.MustCompile(`.*\[.*\].*`)
+							if sliceRe.MatchString(types.ExprString(field.Type)) {
 								arrayInit[jen.Id(n.Name)] = jen.Id(string(src[pos.Type.Pos()-1 : pos.Type.End()-1])).Values(jen.Id(string(src[pos.Type.Pos()+1 : pos.Type.End()-1])).Values())
-							default:
 							}
+
 							// Copy struct field to generated code.
 							if pos.Tag != nil {
 								structFields = append(structFields, jen.Id(n.Name).Id(string(src[pos.Type.Pos()-1:pos.Type.End()-1])).Id(pos.Tag.Value))
