@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,7 +32,6 @@ import (
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -46,6 +44,7 @@ const (
 
 type mdoxMetrics struct {
 	reg *prometheus.Registry
+	dir string
 }
 
 func setupLogger(logLevel, logFormat string) log.Logger {
@@ -82,7 +81,7 @@ func main() {
 		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
 	// Profiling and metrics.
 	profilesPath := app.Flag("debug.profiles", "Path to which CPU and heap profiles are saved").Hidden().String()
-	metrics := app.Flag("metrics", "Enable metrics and view them at https://localhost:9091/metrics").Hidden().Bool()
+	metrics := app.Flag("metrics", "Path to which metrics are saved in OpenMetrics format").Hidden().String()
 
 	m := &mdoxMetrics{}
 
@@ -92,6 +91,11 @@ func main() {
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
+
+	if *metrics != "" {
+		m.dir = *metrics
+		m.reg = prometheus.NewRegistry()
+	}
 
 	if *profilesPath != "" {
 		finalize, err := snapshotProfiles(*profilesPath)
@@ -109,19 +113,6 @@ func main() {
 	}, func(err error) {
 		cancel()
 	})
-
-	if *metrics {
-		srv := &http.Server{Addr: ":9091"}
-		m.reg = prometheus.NewRegistry()
-
-		g.Add(func() error {
-			http.Handle("/metrics", promhttp.HandlerFor(m.reg, promhttp.HandlerOpts{}))
-			return srv.ListenAndServe()
-		}, func(err error) {
-			_ = srv.Shutdown(ctx)
-			cancel()
-		})
-	}
 
 	// Listen for termination signals.
 	{
@@ -178,13 +169,27 @@ func (m *mdoxMetrics) Print() error {
 	if err != nil {
 		return err
 	}
-
-	enc := expfmt.NewEncoder(os.Stdout, expfmt.FmtProtoText)
+	now := time.Now().UTC()
+	if err := os.MkdirAll(filepath.Join(m.dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_")), os.ModePerm); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(m.dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "metrics"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
 	for _, mf := range mfs {
-		if err := enc.Encode(mf); err != nil {
+		for _, metric := range mf.Metric {
+			unixTime := now.Unix()
+			metric.TimestampMs = &unixTime
+		}
+		if _, err := expfmt.MetricFamilyToOpenMetrics(f, mf); err != nil {
 			return err
 		}
+	}
+	if _, err = expfmt.FinalizeOpenMetrics(f); err != nil {
+		return err
 	}
 	return nil
 }
