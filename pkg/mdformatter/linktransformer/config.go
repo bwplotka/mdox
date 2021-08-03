@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -20,6 +21,9 @@ type Config struct {
 	Version int
 
 	Validators []ValidatorConfig `yaml:"validators"`
+	Timeout    string            `yaml:"timeout"`
+
+	timeout time.Duration
 }
 
 type ValidatorConfig struct {
@@ -70,6 +74,14 @@ func ParseConfig(c []byte) (Config, error) {
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, errors.Wrapf(err, "parsing YAML content %q", string(c))
+	}
+
+	if cfg.Timeout != "" {
+		var err error
+		cfg.timeout, err = time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			return Config{}, errors.Wrap(err, "parsing timeout duration")
+		}
 	}
 
 	if len(cfg.Validators) <= 0 {
