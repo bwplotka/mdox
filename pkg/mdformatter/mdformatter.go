@@ -84,6 +84,8 @@ type Formatter struct {
 	bm   BackMatterTransformer
 	link LinkTransformer
 	cb   CodeBlockTransformer
+
+	reg *prometheus.Registry
 }
 
 // Option is a functional option type for Formatter objects.
@@ -114,6 +116,13 @@ func WithLinkTransformer(l LinkTransformer) Option {
 func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	return func(m *Formatter) {
 		m.cb = cb
+	}
+}
+
+// WithMetrics allows you to pass in Prometheus registry.
+func WithMetrics(reg *prometheus.Registry) Option {
+	return func(m *Formatter) {
+		m.reg = reg
 	}
 }
 
@@ -239,33 +248,33 @@ func newSpinner(suffix string) (*yacspin.Spinner, error) {
 }
 
 // Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
-func Format(ctx context.Context, logger log.Logger, files []string, reg *prometheus.Registry, opts ...Option) error {
+func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
 	spin, err := newSpinner(" Formatting: ")
 	if err != nil {
 		return err
 	}
-	return format(ctx, logger, files, nil, spin, reg, opts...)
+	return format(ctx, logger, files, nil, spin, opts...)
 }
 
 // IsFormatted tries to formats given markdown files and return Diff if files are not formatted.
 // If diff is empty it means all files are formatted.
-func IsFormatted(ctx context.Context, logger log.Logger, files []string, reg *prometheus.Registry, opts ...Option) (diffs Diffs, err error) {
+func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ...Option) (diffs Diffs, err error) {
 	d := Diffs{}
 	spin, err := newSpinner(" Checking: ")
 	if err != nil {
 		return nil, err
 	}
-	if err := format(ctx, logger, files, &d, spin, reg, opts...); err != nil {
+	if err := format(ctx, logger, files, &d, spin, opts...); err != nil {
 		return nil, err
 	}
 	return d, nil
 }
 
-func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, reg *prometheus.Registry, opts ...Option) error {
+func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, opts ...Option) error {
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
-	m := newMdformatterMetrics(reg)
+	m := newMdformatterMetrics(f.reg)
 
 	errs := merrors.New()
 	if spin != nil {
@@ -281,7 +290,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			spin.Message(fn + "...")
 		}
 		errs.Add(func() error {
-			start_time := time.Now()
+			startTime := time.Now()
 			m.filesProcessed.Inc()
 
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
@@ -315,8 +324,8 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			if err != nil {
 				return errors.Wrapf(err, "write %v", fn)
 			}
-			time_taken := time.Since(start_time)
-			m.perFileLatency.WithLabelValues(fn).Observe(time_taken.Seconds())
+			timeTaken := time.Since(startTime)
+			m.perFileLatency.WithLabelValues(fn).Observe(timeTaken.Seconds())
 
 			return file.Truncate(int64(n))
 		}())

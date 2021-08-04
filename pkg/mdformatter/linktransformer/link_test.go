@@ -51,13 +51,13 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{
 			filepath.Join(tmpDir, "repo", "docs", "a", "doc.md"),
 			filepath.Join(tmpDir, "repo", "docs", "doc2.md"),
-		}, nil)
+		})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 	})
 
 	t.Run("no domain specified", func(t *testing.T) {
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, nil, mdformatter.WithLinkTransformer(
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, mdformatter.WithLinkTransformer(
 			NewLocalizer(logger, regexp.MustCompile(`^$`), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -75,7 +75,7 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 	})
 
 	t.Run("domain specified, but without full path", func(t *testing.T) {
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, nil, mdformatter.WithLinkTransformer(
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, mdformatter.WithLinkTransformer(
 			NewLocalizer(logger, regexp.MustCompile(`myproject.example.com`), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -93,7 +93,7 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 	})
 
 	t.Run("domain specified", func(t *testing.T) {
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, nil, mdformatter.WithLinkTransformer(
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{filepath.Join(tmpDir, "repo", "docs", "a", "doc.md")}, mdformatter.WithLinkTransformer(
 			NewLocalizer(logger, regexp.MustCompile(`myproject.example.com/tip/`), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -135,11 +135,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -152,11 +152,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 		testutil.Ok(t, ioutil.WriteFile(testFile2, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, nil, mdformatter.WithLinkTransformer(
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -170,11 +170,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 [1](.) [2](#yolo) [3](../test/valid-local-links.md) [4](../test/valid-local-links.md#yolo) [5](../a/doc.md)
 `), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -192,11 +192,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 [2](#run-time-deduplication-of-ha-groups)
 `), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -214,11 +214,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 [2](#hugo-का-उपयोग-करते-हुए-स्थानीय-रूप-से-साइट-चलाना)
 `), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -237,11 +237,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 [1](.) [2](#not-yolo) [3](../test2/invalid-local-links.md) [4](../test/invalid-local-links.md#not-yolo) [5](../test/doc.md)
 `), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
@@ -263,11 +263,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		relDirPath, err := filepath.Rel(wdir, tmpDir)
 		testutil.Ok(t, err)
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte(""), anchorDir),
 		))
 		testutil.NotOk(t, err)
@@ -278,11 +278,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link2.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://www.github.com/ https://bwplotka.dev/does-not-exits\n"), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka'\n    type: 'ignore'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -292,11 +292,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "links.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://fakelink1.com/ http://fakelink2.com/ https://www.fakelink3.com/\n"), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: '(^http[s]?:\\/\\/)(www\\.)?(fakelink[0-9]\\.com\\/)'\n    type: 'ignore'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)
@@ -308,11 +308,11 @@ func TestValidator_TransformDestination(t *testing.T) {
 		// This is substituted in config using PathorContent flag. But need to pass it directly here.
 		repoToken := os.Getenv("GITHUB_TOKEN")
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil)
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, nil, mdformatter.WithLinkTransformer(
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
 			MustNewValidator(logger, []byte("version: 1\n\nvalidators:\n  - regex: 'bwplotka\\/mdox'\n    token: '"+repoToken+"'\n    type: 'github'\n"), anchorDir),
 		))
 		testutil.Ok(t, err)

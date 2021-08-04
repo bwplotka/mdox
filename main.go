@@ -266,8 +266,10 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			opts = append(opts, mdformatter.WithLinkTransformer(linktransformer.NewChain(linkTr...)))
 		}
 
+		opts = append(opts, mdformatter.WithMetrics(m.reg))
+
 		if *checkOnly {
-			diff, err := mdformatter.IsFormatted(ctx, logger, *files, m.reg, opts...)
+			diff, err := mdformatter.IsFormatted(ctx, logger, *files, opts...)
 			if err != nil {
 				return err
 			}
@@ -288,7 +290,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			return errors.Errorf("files not formatted: %v", diffOut)
 
 		}
-		return mdformatter.Format(ctx, logger, *files, m.reg, opts...)
+		return mdformatter.Format(ctx, logger, *files, opts...)
 	})
 }
 

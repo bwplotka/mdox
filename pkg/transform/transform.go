@@ -101,7 +101,7 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 	}
 
 	// Once we did all the changes, change links.
-	return mdformatter.Format(ctx, logger, tr.filesToLinkAdjust, nil, mdformatter.WithLinkTransformer(tr.linkTransformer))
+	return mdformatter.Format(ctx, logger, tr.filesToLinkAdjust, mdformatter.WithLinkTransformer(tr.linkTransformer))
 }
 
 type transformer struct {
@@ -217,7 +217,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		return nil
 	}
 
-	return mdformatter.Format(t.ctx, t.logger, []string{target}, nil, opts...)
+	return mdformatter.Format(t.ctx, t.logger, []string{target}, opts...)
 }
 
 type relLinkTransformer struct {
