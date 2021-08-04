@@ -16,7 +16,7 @@ type Validator interface {
 
 // GitHubPullsIssuesValidator.IsValid skips visiting all github issue/PR links.
 func (v GitHubPullsIssuesValidator) IsValid(k futureKey, r *validator) (bool, error) {
-  r.l.githubSkippedLinks.Inc()
+	r.l.githubSkippedLinks.Inc()
 	// Find rightmost index of match i.e, where regex match ends.
 	// This will be where issue/PR number starts. Split incase of section link and convert to int.
 	rightmostIndex := v._regex.FindStringIndex(k.dest)
