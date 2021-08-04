@@ -18,6 +18,7 @@ transformations:
             path: "/**"
 
   - glob: "**/README.md"
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"

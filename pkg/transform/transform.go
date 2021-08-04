@@ -171,14 +171,29 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 			return errors.Errorf("front matter option set on file that after transformation is non-markdown: %v", target)
 		}
 
-		firstHeader, rest, err := popFirstHeader(path)
+		dir, file := filepath.Split(path)
+		// Remove trailing slash after split and check if root file.
+		if dir[:len(dir)-1] == t.c.InputDir && isMDFile(file) && tr.PopHeader == nil {
+			// Default popHeader to true for inputDir root file.
+			tr.PopHeader = func() *bool { b := true; return &b }()
+		}
+
+		// If unset and not root file.
+		if tr.PopHeader == nil {
+			tr.PopHeader = func() *bool { b := false; return &b }()
+		}
+
+		firstHeader, rest, err := getFirstHeader(path, *tr.PopHeader)
 		if err != nil {
 			return errors.Wrap(err, "read first header")
 		}
 
-		if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
-			return err
+		if rest != nil {
+			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
+				return err
+			}
 		}
+
 		_, originFilename := filepath.Split(path)
 		_, targetFilename := filepath.Split(target)
 		opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
@@ -413,7 +428,7 @@ func copyFiles(src, dst string) (err error) {
 
 // TODO(bwplotka): Use formatter, remove the title etc.
 // Super hacky for now.
-func popFirstHeader(path string) (_ string, rest []byte, err error) {
+func getFirstHeader(path string, popHeader bool) (_ string, rest []byte, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", nil, err
@@ -424,6 +439,9 @@ func popFirstHeader(path string) (_ string, rest []byte, err error) {
 	for scanner.Scan() {
 		text := scanner.Text()
 		if strings.HasPrefix(text, "#") {
+			if !popHeader {
+				return strings.TrimPrefix(text, "# "), rest, scanner.Err()
+			}
 			if _, err := file.Seek(int64(len(text)), 0); err != nil {
 				return "", nil, errors.Wrap(err, "seek")
 			}

@@ -17,6 +17,7 @@ transformations:
 
   - glob: "../test.md"
     path: /_index.md
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
@@ -27,6 +28,7 @@ transformations:
             path: "/**"
 
   - glob: "doc.md"
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
@@ -34,6 +36,7 @@ transformations:
 
   - glob: "Team/doc.md"
     path: inner/doc.md
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"
@@ -41,6 +44,7 @@ transformations:
 
   - glob: "**/README.md"
     path: /test1/_index.md
+    popHeader: true
     frontMatter:
       template: |
         title: "{{ .Origin.FirstHeader }}"

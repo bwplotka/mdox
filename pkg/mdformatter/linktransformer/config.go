@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -20,17 +21,20 @@ type Config struct {
 	Version int
 
 	Validators []ValidatorConfig `yaml:"validators"`
+	Timeout    string            `yaml:"timeout"`
+
+	timeout time.Duration
 }
 
 type ValidatorConfig struct {
-	// Regex for type github is reponame matcher, like `bwplotka\/mdox`.
+	// Regex for type of validator. For `githubPullsIssues` this is: (^http[s]?:\/\/)(www\.)?(github\.com\/){ORG_NAME}\/{REPO_NAME}(\/pull\/|\/issues\/).
 	Regex string `yaml:"regex"`
-	// By default type is `ignore`. Could be `github` or `roundtrip`.
+	// By default type is `roundtrip`. Could be `githubPullsIssues` or `ignore`.
 	Type ValidatorType `yaml:"type"`
 	// GitHub repo token to avoid getting rate limited.
 	Token string `yaml:"token"`
 
-	ghValidator GitHubValidator
+	ghValidator GitHubPullsIssuesValidator
 	rtValidator RoundTripValidator
 	igValidator IgnoreValidator
 }
@@ -39,7 +43,7 @@ type RoundTripValidator struct {
 	_regex *regexp.Regexp
 }
 
-type GitHubValidator struct {
+type GitHubPullsIssuesValidator struct {
 	_regex  *regexp.Regexp
 	_maxNum int
 }
@@ -51,9 +55,9 @@ type IgnoreValidator struct {
 type ValidatorType string
 
 const (
-	roundtripValidator ValidatorType = "roundtrip"
-	githubValidator    ValidatorType = "github"
-	ignoreValidator    ValidatorType = "ignore"
+	roundtripValidator         ValidatorType = "roundtrip"
+	githubPullsIssuesValidator ValidatorType = "githubPullsIssues"
+	ignoreValidator            ValidatorType = "ignore"
 )
 
 const (
@@ -72,6 +76,14 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, errors.Wrapf(err, "parsing YAML content %q", string(c))
 	}
 
+	if cfg.Timeout != "" {
+		var err error
+		cfg.timeout, err = time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			return Config{}, errors.Wrap(err, "parsing timeout duration")
+		}
+	}
+
 	if len(cfg.Validators) <= 0 {
 		return Config{}, errors.New("No validator provided")
 	}
@@ -81,10 +93,11 @@ func ParseConfig(c []byte) (Config, error) {
 		switch cfg.Validators[i].Type {
 		case roundtripValidator:
 			cfg.Validators[i].rtValidator._regex = regexp.MustCompile(cfg.Validators[i].Regex)
-		case githubValidator:
+		case githubPullsIssuesValidator:
+			// Get maxNum from provided regex or fail.
 			regex, maxNum, err := getGitHubRegex(cfg.Validators[i].Regex, cfg.Validators[i].Token)
 			if err != nil {
-				return Config{}, errors.Wrapf(err, "parsing GitHub Regex %v", err)
+				return Config{}, errors.Wrapf(err, "parsing githubPullsIssues Regex")
 			}
 			cfg.Validators[i].ghValidator._regex = regex
 			cfg.Validators[i].ghValidator._maxNum = maxNum
@@ -98,12 +111,12 @@ func ParseConfig(c []byte) (Config, error) {
 }
 
 // getGitHubRegex returns GitHub pulls/issues regex from repo name.
-func getGitHubRegex(repoRe string, repoToken string) (*regexp.Regexp, int, error) {
-	// Get reponame from regex.
-	getRepo := regexp.MustCompile(`(?P<org>[A-Za-z0-9_.-]+)\\\/(?P<repo>[A-Za-z0-9_.-]+)`)
-	match := getRepo.FindStringSubmatch(repoRe)
+func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int, error) {
+	// Get reponame from Pulls & Issues regex. This also checks whether user provided regex is valid (inception again!).
+	getRepo := regexp.MustCompile(`\(\^http\[s\]\?:\\\/\\\/\)\(www\\\.\)\?\(github\\\.com\\\/\)(?P<org>[A-Za-z0-9_.-]+)\\\/(?P<repo>[A-Za-z0-9_.-]+)\(\\\/pull\\\/\|\\\/issues\\\/\)`)
+	match := getRepo.FindStringSubmatch(pullsIssuesRe)
 	if len(match) != 3 {
-		return nil, math.MaxInt64, errors.New("repo name regex not valid")
+		return nil, math.MaxInt64, errors.New(`GitHub PR/Issue regex not valid. Correct regex: (^http[s]?:\/\/)(www\.)?(github\.com\/){ORG_NAME}\/{REPO_NAME}(\/pull\/|\/issues\/)`)
 	}
 	reponame := match[1] + "/" + match[2]
 
@@ -163,5 +176,5 @@ func getGitHubRegex(repoRe string, repoToken string) (*regexp.Regexp, int, error
 		max = issueNum[0].Number
 	}
 
-	return regexp.MustCompile(`(^http[s]?:\/\/)(www\.)?(github\.com\/)(` + repoRe + `)(\/pull\/|\/issues\/)`), max, nil
+	return regexp.MustCompile(pullsIssuesRe), max, nil
 }
