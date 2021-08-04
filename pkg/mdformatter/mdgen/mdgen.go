@@ -20,6 +20,10 @@ const (
 	infoStringKeyExitCode = "mdox-expect-exit-code"
 )
 
+var (
+	newLineChar = []byte("\n")
+)
+
 type genCodeBlockTransformer struct{}
 
 func NewCodeBlockTransformer() *genCodeBlockTransformer {
@@ -84,7 +88,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 			}
 			return nil, errors.Wrapf(err, "run %v, out: %v", execCmd, b.String())
 		}
-		return b.Bytes(), nil
+		output := b.Bytes()
+		// Add newline to output if not present.
+		if !bytes.HasSuffix(output, newLineChar) {
+			output = append(output, newLineChar...)
+		}
+		return output, nil
 	}
 
 	panic("should never get here")

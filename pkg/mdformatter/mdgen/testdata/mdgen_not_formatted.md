@@ -40,3 +40,6 @@ abc
 
 ```yaml mdox-exec="bash ./testdata/out2.sh --name=queryfrontend.InMemoryResponseCacheConfig"
 ```
+
+```bash mdox-exec="cat ./testdata/out3.sh"
+```
