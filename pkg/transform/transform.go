@@ -194,6 +194,15 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 			}
 		}
 
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.Wrap(err, "get working dir for Path")
+		}
+		originPath, err := filepath.Rel(wd, path)
+		if err != nil {
+			return errors.Wrap(err, "rel path to working dir")
+		}
+
 		_, originFilename := filepath.Split(path)
 		_, targetFilename := filepath.Split(target)
 		opts = append(opts, mdformatter.WithFrontMatterTransformer(&frontMatterTransformer{
@@ -202,6 +211,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 			origin: MatterOrigin{
 				Filename:    originFilename,
 				FirstHeader: firstHeader,
+				Path:        originPath,
 				LastMod:     info.ModTime().String(),
 			},
 			target: MatterTarget{
@@ -214,12 +224,23 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		if !isMDFile(target) {
 			return errors.Errorf("back matter option set on file that after transformation is non-markdown: %v", target)
 		}
+
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.Wrap(err, "get working dir for Path")
+		}
+		originPath, err := filepath.Rel(wd, path)
+		if err != nil {
+			return errors.Wrap(err, "rel path to working dir")
+		}
+
 		_, originFilename := filepath.Split(path)
 		_, targetFilename := filepath.Split(target)
 		opts = append(opts, mdformatter.WithBackMatterTransformer(&backMatterTransformer{
 			b: tr.BackMatter,
 			origin: MatterOrigin{
 				Filename: originFilename,
+				Path:     originPath,
 				LastMod:  info.ModTime().String(),
 			},
 			target: MatterTarget{
@@ -328,6 +349,7 @@ type MatterOrigin struct {
 	Filename    string
 	FirstHeader string
 	LastMod     string
+	Path        string
 }
 
 type MatterTarget struct {
