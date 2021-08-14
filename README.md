@@ -40,6 +40,14 @@ Flags:
       --version                  Show application version.
       --log.level=info           Log filtering level.
       --log.format=clilog        Log format to use.
+      --profiles.path=PROFILES.PATH  
+                                 Path to directory where CPU and heap profiles
+                                 will be saved; If empty, no profiling will be
+                                 enabled.
+      --metrics.path=METRICS.PATH  
+                                 Path to directory where metrics are saved in
+                                 OpenMetrics format; If empty, no metrics will
+                                 be saved.
       --check                    If true, fmt will not modify the given files,
                                  instead it will fail if files needs formatting
       --code.disable-directives  If false, fmt will parse custom fenced code
