@@ -10,4 +10,4 @@ Yolo
 
 ![Image](../images/logo2.png)
 
-![Outside](../../test.go)
+![Outside](https://github.com/bwplotka/mdox/tree/main/testdata/test.go)

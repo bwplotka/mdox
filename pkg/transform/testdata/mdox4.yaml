@@ -1,0 +1,51 @@
+version: 1
+
+inputDir: "testdata/testproj"
+outputDir: "testdata/tmp/test4/4"
+extraInputGlobs:
+  - "testdata/test.md"
+  - "testdata/teststatic"
+
+glueLink: "https://github.com/bwplotka/mdox/tree/main"
+gitIgnored: true
+localLinksStyle:
+  hugo:
+    indexFileName: "_index.md"
+
+transformations:
+  - glob: "../teststatic/**"
+    path: /favicons/**
+
+  - glob: "../test.md"
+    path: /_index.md
+    popHeader: true
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+
+        cascade:
+        - type: "docs"
+          _target:
+            path: "/**"
+
+  - glob: "doc.md"
+    popHeader: true
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+        slug: "{{ .Target.FileName }}"
+
+  - glob: "Team/doc.md"
+    path: inner/doc.md
+    popHeader: true
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+        yolo: "yolo"
+
+  - glob: "**/README.md"
+    path: /test1/_index.md
+    popHeader: true
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"

@@ -25,6 +25,15 @@ func isMDFile(path string) bool {
 	return filepath.Ext(path) == ".md"
 }
 
+func isImgFile(path string) bool {
+	switch filepath.Ext(path) {
+	case ".png", ".jpg", "jpeg", ".svg", ".gif", ".webp":
+		return true
+	default:
+	}
+	return false
+}
+
 func prepOutputDir(d string, gitIgnored bool) error {
 	_, err := os.Stat(d)
 	if err != nil && !os.IsNotExist(err) {
@@ -67,6 +76,7 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 		linkTransformer: &relLinkTransformer{
 			localLinksStyle: c.LocalLinksStyle,
 			inputDir:        c.InputDir,
+			glueLink:        c.GlueLink,
 			outputDir:       c.OutputDir,
 			oldRelPath:      map[string]string{},
 			newRelPath:      map[string]string{},
@@ -261,6 +271,7 @@ type relLinkTransformer struct {
 
 	inputDir   string
 	outputDir  string
+	glueLink   string
 	oldRelPath map[string]string
 	newRelPath map[string]string
 }
@@ -294,6 +305,30 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 		if err != nil {
 			return nil, errors.Wrap(err, "link: clean old dest path")
 		}
+	}
+
+	// Non md or image relative link, so needs link to be glued.
+	if !isMDFile(relDest) && !isImgFile(relDest) && r.glueLink != "" {
+		workingDir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		// Original path before transform needs to be figured out.
+		// Case where file is in same position after transform.
+		oldRelPath := filepath.Join(r.inputDir, curRelDir, relDest)
+		if _, err := os.Stat(oldRelPath); os.IsNotExist(err) {
+			// File is moved to new dir after transform.
+			oldRelPath = filepath.Join(workingDir, curRelDir, relDest)
+			if _, err := os.Stat(oldRelPath); os.IsNotExist(err) {
+				// File is extra input glob.
+				oldRelPath = filepath.Join(workingDir, relDest)
+			}
+		}
+		originalRelPath, err := filepath.Rel(workingDir, oldRelPath)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(r.glueLink + "/" + originalRelPath), nil
 	}
 
 	currDest := oldRelDest

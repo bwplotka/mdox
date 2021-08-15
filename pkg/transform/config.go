@@ -39,6 +39,9 @@ type Config struct {
 	// ExtraInputGlobs allows to bring files from outside of input dir.
 	ExtraInputGlobs []string `yaml:"extraInputGlobs"`
 
+	// GlueLink specifies link to be glued onto relative links which don't point to markdown or image files.
+	GlueLink string `yaml:"glueLink"`
+
 	// Transformations to apply for any file.
 	Transformations []*TransformationConfig
 

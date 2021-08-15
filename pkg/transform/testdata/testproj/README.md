@@ -10,4 +10,4 @@ Yolo
 
 ![Image](images/logo2.png)
 
-![Outside](../../../../main.go)
+![Outside](../test.go)
