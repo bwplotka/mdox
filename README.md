@@ -166,6 +166,14 @@ Flags:
       --version                  Show application version.
       --log.level=info           Log filtering level.
       --log.format=clilog        Log format to use.
+      --profiles.path=PROFILES.PATH  
+                                 Path to directory where CPU and heap profiles
+                                 will be saved; If empty, no profiling will be
+                                 enabled.
+      --metrics.path=METRICS.PATH  
+                                 Path to directory where metrics are saved in
+                                 OpenMetrics format; If empty, no metrics will
+                                 be saved.
       --config-file=<file-path>  Path to Path to the YAML file with spec defined
                                  in
                                  github.com/bwplotka/mdox/pkg/transform.Config

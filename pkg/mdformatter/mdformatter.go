@@ -85,7 +85,7 @@ type Formatter struct {
 	link LinkTransformer
 	cb   CodeBlockTransformer
 
-	reg *prometheus.Registry
+	reg       *prometheus.Registry
 	softWraps bool
 }
 
@@ -120,11 +120,11 @@ func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	}
 }
 
-
 // WithMetrics allows you to pass in Prometheus registry.
 func WithMetrics(reg *prometheus.Registry) Option {
 	return func(m *Formatter) {
 		m.reg = reg
+	}
 }
 
 // WithCodeBlockTransformer allows you to override default softWrap.
