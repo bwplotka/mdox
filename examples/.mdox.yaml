@@ -1,0 +1,39 @@
+version: 1
+
+inputDir: "docs"
+outputDir: "website/docs-pre-processed/tip"
+extraInputGlobs:
+  - "CHANGELOG.md"
+  - "static"
+
+gitIgnored: true
+localLinksStyle:
+  hugo:
+    indexFileName: "_index.md"
+
+transformations:
+
+  - glob: "../CHANGELOG.md"
+    path: /thanos/CHANGELOG.md
+    popHeader: true
+    frontMatter:
+      template: |
+        title: "{{ .Origin.FirstHeader }}"
+        type: docs
+        lastmod: "{{ .Origin.LastMod }}"
+    backMatter:
+      template: |
+        Found a typo, inconsistency or missing information in our docs?
+        Help us to improve [Thanos](https://thanos.io) documentation by proposing a fix [on GitHub here](https://github.com/thanos-io/thanos/edit/main/{{ .Origin.Filename }}) :heart:
+
+  - glob: "getting-started.md"
+    path: /thanos/getting-started.md
+    frontMatter:
+      template: |
+        type: docs
+        title: "{{ .Origin.FirstHeader }}"
+        lastmod: "{{ .Origin.LastMod }}"
+        slug: "{{ .Target.FileName }}"
+
+  - glob: "../static/**"
+    path: /favicons/**
