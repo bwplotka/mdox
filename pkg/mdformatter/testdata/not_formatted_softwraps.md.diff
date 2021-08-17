@@ -1,0 +1,23 @@
+--- testdata/not_formatted_softwraps.md
++++ testdata/not_formatted_softwraps.md (formatted)
+@@ -0,2 +0,2 @@
+ # Quick Tutorial
+
+-Feel free to check the free, in-browser interactive 
++Feel free to check the free, in-browser interactive
+ tutorial [as Katacoda Thanos Course](https://katacoda.com/bwplotka/courses/thanos)
+-We will be progressively updating our 
++We will be progressively updating our
+ Katacoda Course with more scenarios.
+
+ On top of this feel free to go through our tutorial presented here:
+@@ -10,1 +10,2 @@
+ Yolo email something@gmail.com
+
+ * [ ] task
++  * [X] task
+-  * [x] task
++
+ ### Prometheus
+
+ The `thanos rule` command evaluates Prometheus recording and alerting rules

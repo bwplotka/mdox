@@ -1,5 +1,6 @@
 include .bingo/Variables.mk
-FILES_TO_FMT      ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
+FILES_TO_FMT      	 ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
+MDOX_VALIDATE_CONFIG ?= .mdox.validate.yaml
 
 GO111MODULE       ?= on
 export GO111MODULE
@@ -56,12 +57,12 @@ deps: ## Ensures fresh go.mod and go.sum.
 .PHONY: docs
 docs: build ## Generates config snippets and doc formatting.
 	@echo ">> generating docs $(PATH)"
-	@PATH=$(GOBIN) mdox fmt -l *.md
+	PATH=${PATH}:$(GOBIN) mdox fmt -l --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) *.md
 
 .PHONY: check-docs
 check-docs: build ## Checks docs for discrepancies in formatting and links.
 	@echo ">> checking formatting and links $(PATH)"
-	@PATH=$(GOBIN) mdox fmt --check -l *.md
+	PATH=${PATH}:$(GOBIN) mdox fmt --check -l --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) *.md
 
 .PHONY: format
 format: ## Formats Go code.

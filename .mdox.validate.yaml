@@ -1,0 +1,6 @@
+version: 1
+
+validators:
+  # Validators to skip checking PR/issue links of mdox.
+  - regex: '(^http[s]?:\/\/)(www\.)?(github\.com\/)bwplotka\/mdox(\/pull\/|\/issues\/)'
+    type: 'githubPullsIssues'

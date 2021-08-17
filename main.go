@@ -199,6 +199,7 @@ func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
 	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
+	softWraps := cmd.Flag("soft-wraps", "If true, fmt will preserve soft line breaks for given files").Bool()
 
 	disableGenCodeBlocksDirectives := cmd.Flag("code.disable-directives", `If false, fmt will parse custom fenced code directives prefixed with 'mdox-gen' to autogenerate code snippets. For example:
 	`+"```"+`<lang> mdox-exec="<executable + arguments>"
@@ -219,6 +220,9 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		var opts []mdformatter.Option
 		if !*disableGenCodeBlocksDirectives {
 			opts = append(opts, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
+		}
+		if *softWraps {
+			opts = append(opts, mdformatter.WithSoftWraps())
 		}
 		if len(*files) == 0 {
 			return errors.New("no files to format")

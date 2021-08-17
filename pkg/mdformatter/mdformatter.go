@@ -86,6 +86,7 @@ type Formatter struct {
 	cb   CodeBlockTransformer
 
 	reg *prometheus.Registry
+	softWraps bool
 }
 
 // Option is a functional option type for Formatter objects.
@@ -119,10 +120,17 @@ func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	}
 }
 
+
 // WithMetrics allows you to pass in Prometheus registry.
 func WithMetrics(reg *prometheus.Registry) Option {
 	return func(m *Formatter) {
 		m.reg = reg
+}
+
+// WithCodeBlockTransformer allows you to override default softWrap.
+func WithSoftWraps() Option {
+	return func(m *Formatter) {
+		m.softWraps = true
 	}
 }
 
@@ -384,8 +392,12 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	// Hack: run Convert two times to ensure deterministic whitespace alignment.
 	// This also immediately show transformers which are not working well together etc.
 	tmp := bytes.Buffer{}
+	renderer := markdown.NewRenderer()
+	if f.softWraps {
+		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
+	}
 	tr := &transformer{
-		wrapped:   markdown.NewRenderer(),
+		wrapped:   renderer,
 		sourceCtx: sourceCtx,
 		link:      f.link, cb: f.cb,
 		frontMatterLen: len(frontMatter),
@@ -403,7 +415,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
-		goldmark.WithRenderer(markdown.NewRenderer()), // No transforming for second phase.
+		goldmark.WithRenderer(renderer), // No transforming for second phase.
 	).Convert(tmp.Bytes(), out); err != nil {
 		return errors.Wrapf(err, "second formatting phase for %v", file.Name())
 	}

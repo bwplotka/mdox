@@ -107,3 +107,44 @@ func TestFormat_FormatSingle_Transformers(t *testing.T) {
 
 	testutil.Equals(t, true, m.closed)
 }
+
+func TestFormat_FormatSingle_SoftWraps(t *testing.T) {
+	file, err := os.OpenFile("testdata/not_formatted_softwraps.md", os.O_RDONLY, 0)
+	testutil.Ok(t, err)
+	defer file.Close()
+
+	f := New(context.Background(), WithSoftWraps())
+
+	exp, err := ioutil.ReadFile("testdata/formatted_softwraps.md")
+	testutil.Ok(t, err)
+
+	t.Run("Format not formatted", func(t *testing.T) {
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+
+	t.Run("Format formatted", func(t *testing.T) {
+		file2, err := os.OpenFile("testdata/formatted_softwraps.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file2.Close()
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file2, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+}
+
+func TestCheck_SoftWraps(t *testing.T) {
+	diff, err := IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/formatted_softwraps.md"}, WithSoftWraps())
+	testutil.Ok(t, err)
+	testutil.Equals(t, 0, len(diff))
+	testutil.Equals(t, "files the same; no diff", diff.String())
+
+	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted_softwraps.md"}, WithSoftWraps())
+	testutil.Ok(t, err)
+
+	exp, err := ioutil.ReadFile("testdata/not_formatted_softwraps.md.diff")
+	testutil.Ok(t, err)
+	testutil.Equals(t, string(exp), diff.String())
+}

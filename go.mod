@@ -3,7 +3,7 @@ module github.com/bwplotka/mdox
 go 1.15
 
 require (
-	github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210622145915-e6bf3dcd02de
+	github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210810103848-727f02f4c51c
 	github.com/antchfx/xmlquery v1.3.4 // indirect
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/efficientgo/tools/core v0.0.0-20210609125236-d73259166f20
