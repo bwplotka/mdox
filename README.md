@@ -44,6 +44,8 @@ Flags:
       --log.format=clilog        Log format to use.
       --check                    If true, fmt will not modify the given files,
                                  instead it will fail if files needs formatting
+      --soft-wraps               If true, fmt will preserve soft line breaks for
+                                 given files
       --code.disable-directives  If false, fmt will parse custom fenced code
                                  directives prefixed with 'mdox-gen' to
                                  autogenerate code snippets. For example:

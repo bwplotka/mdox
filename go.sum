@@ -26,8 +26,8 @@ github.com/GeertJohan/go.incremental v1.0.0/go.mod h1:6fAjUhbVuX1KcMD3c8TEgVUqmo
 github.com/GeertJohan/go.rice v1.0.0/go.mod h1:eH6gbSOAUv07dQuZVnBmoDP8mgsM1rtixis4Tib9if0=
 github.com/GoogleCloudPlatform/cloudsql-proxy v0.0.0-20190418212003-6ac0b49e7197/go.mod h1:aJ4qN3TfrelA6NZ6AXsXRfmEVaYin3EDbSPJrKS8OXo=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
-github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210622145915-e6bf3dcd02de h1:VpixUG1dDCCTtgTdSPoxuyzwDqLLt1dXZ5v4Ur0c9PY=
-github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210622145915-e6bf3dcd02de/go.mod h1:LFJueuHZej/Z7Xhqh/XgClfkDjZiiEBOLVTt1Duq1r0=
+github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210810103848-727f02f4c51c h1:rnouiLtDKeaWKnxRViK454oCI8jkhWv5fItCvZ9nJOU=
+github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20210810103848-727f02f4c51c/go.mod h1:LFJueuHZej/Z7Xhqh/XgClfkDjZiiEBOLVTt1Duq1r0=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/PuerkitoBio/goquery v1.5.1 h1:PSPBGne8NIUWw+/7vFBV+kG2J/5MOjbzc7154OaKCSE=
 github.com/PuerkitoBio/goquery v1.5.1/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
