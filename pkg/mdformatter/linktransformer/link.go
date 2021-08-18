@@ -126,7 +126,7 @@ type validator struct {
 	c           *colly.Collector
 
 	futureMu    sync.Mutex
-	destFutures map[futureKey]*futureResult
+	destFutures sync.Map
 }
 
 type futureKey struct {
@@ -157,7 +157,6 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
 		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
-		destFutures:    map[futureKey]*futureResult{},
 	}
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
@@ -167,7 +166,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 	if err := v.c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 100,
+		Parallelism: 5,
 	}); err != nil {
 		return nil, err
 	}
@@ -238,6 +237,11 @@ func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir s
 }
 
 func (v *validator) TransformDestination(ctx mdformatter.SourceContext, destination []byte) (_ []byte, err error) {
+	select {
+	case <-ctx.Context.Done():
+		return nil, ctx.Err()
+	default:
+	}
 	v.visit(ctx.Filepath, string(destination), ctx.LineNumbers)
 	return destination, nil
 }
@@ -246,7 +250,14 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	v.c.Wait()
 
 	var keys []futureKey
-	for k := range v.destFutures {
+	// Read map from sync.Map.
+	destFuturesMap := map[futureKey]*futureResult{}
+	v.destFutures.Range(func(key, value interface{}) bool {
+		destFuturesMap[key.(futureKey)] = value.(*futureResult)
+		return true
+	})
+
+	for k := range destFuturesMap {
 		if k.filepath != ctx.Filepath {
 			continue
 		}
@@ -267,7 +278,7 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	}
 
 	for _, k := range keys {
-		f := v.destFutures[k]
+		f := destFuturesMap[k]
 		if err := f.resultFn(); err != nil {
 			if f.cases == 1 {
 				merr.Add(errors.Wrapf(err, "%v:%v", path, k.lineNumbers))
@@ -283,11 +294,16 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.futureMu.Lock()
 	defer v.futureMu.Unlock()
 	k := futureKey{filepath: filepath, dest: dest, lineNumbers: lineNumbers}
-	if _, ok := v.destFutures[k]; ok {
-		v.destFutures[k].cases++
+	// If key present, delete and increment cases.
+	if prevResult, loaded := v.destFutures.LoadAndDelete(k); loaded {
+		newResult := prevResult.(*futureResult)
+		newResult.cases++
+		v.destFutures.Store(k, newResult)
 		return
 	}
-	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
+
+	// Key not present, no store.
+	v.destFutures.Store(k, &futureResult{cases: 1, resultFn: func() error { return nil }})
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
 		// Check if link is email address.
@@ -304,7 +320,10 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 
 		// Local link. Check if exists.
 		if err := v.localLinks.Lookup(newDest); err != nil {
-			v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
+			prevResult, _ := v.destFutures.LoadAndDelete(k)
+			newResult := prevResult.(*futureResult)
+			newResult.resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
+			v.destFutures.Store(k, newResult)
 		}
 		return
 	}

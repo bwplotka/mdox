@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
@@ -226,7 +227,7 @@ func newSpinner(suffix string) (*yacspin.Spinner, error) {
 
 // Format formats given markdown files in-place. IsFormatted `With...` function to see what modifiers you can add.
 func Format(ctx context.Context, logger log.Logger, files []string, opts ...Option) error {
-	spin, err := newSpinner(" Formatting: ")
+	spin, err := newSpinner(" Formatting... ")
 	if err != nil {
 		return err
 	}
@@ -237,7 +238,7 @@ func Format(ctx context.Context, logger log.Logger, files []string, opts ...Opti
 // If diff is empty it means all files are formatted.
 func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ...Option) (diffs Diffs, err error) {
 	d := Diffs{}
-	spin, err := newSpinner(" Checking: ")
+	spin, err := newSpinner(" Checking... ")
 	if err != nil {
 		return nil, err
 	}
@@ -249,57 +250,73 @@ func IsFormatted(ctx context.Context, logger log.Logger, files []string, opts ..
 
 func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs, spin *yacspin.Spinner, opts ...Option) error {
 	f := New(ctx, opts...)
-	b := bytes.Buffer{}
-	// TODO(bwplotka): Add concurrency (collector will need to redone).
+	errorChannel := make(chan error)
+	var wg sync.WaitGroup
 
 	errs := merrors.New()
 	if spin != nil {
 		errs.Add(spin.Start())
 	}
+
+	wg.Add(len(files))
+
+	go func() {
+		wg.Wait()
+		close(errorChannel)
+	}()
+
 	for _, fn := range files {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		if spin != nil {
-			spin.Message(fn + "...")
-		}
-		errs.Add(func() error {
+		go func(fn string) {
+			defer wg.Done()
+			b := bytes.Buffer{}
+
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
-				return errors.Wrapf(err, "open %v", fn)
+				errorChannel <- errors.Wrapf(err, "open %v", fn)
+				return
 			}
 			defer logerrcapture.ExhaustClose(logger, file, "close file %v", fn)
 
 			b.Reset()
 			if err := f.Format(file, &b); err != nil {
-				return err
+				errorChannel <- err
+				return
 			}
 
 			if diffs != nil {
 				if _, err := file.Seek(0, 0); err != nil {
-					return err
+					errorChannel <- err
+					return
 				}
 
 				in, err := ioutil.ReadAll(file)
 				if err != nil {
-					return errors.Wrapf(err, "read all %v", fn)
+					errorChannel <- errors.Wrapf(err, "read all %v", fn)
+					return
 				}
 
 				if !bytes.Equal(in, b.Bytes()) {
 					*diffs = append(*diffs, gitdiff.CompareBytes(in, fn, b.Bytes(), fn+" (formatted)"))
 				}
-				return nil
+				return
 			}
 
 			n, err := file.WriteAt(b.Bytes(), 0)
 			if err != nil {
-				return errors.Wrapf(err, "write %v", fn)
+				errorChannel <- errors.Wrapf(err, "write %v", fn)
+				return
 			}
-			return file.Truncate(int64(n))
-		}())
+			if err := file.Truncate(int64(n)); err != nil {
+				errorChannel <- err
+				return
+			}
+		}(fn)
 	}
+
+	for err := range errorChannel {
+		errs.Add(err)
+	}
+
 	if spin != nil {
 		errs.Add(spin.Stop())
 	}
