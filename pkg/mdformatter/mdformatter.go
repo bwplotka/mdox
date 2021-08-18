@@ -20,12 +20,35 @@ import (
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/theckman/yacspin"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"gopkg.in/yaml.v3"
 )
+
+type mdformatterMetrics struct {
+	filesProcessed prometheus.Counter
+	perFileLatency *prometheus.HistogramVec
+}
+
+func newMdformatterMetrics(reg *prometheus.Registry) *mdformatterMetrics {
+	m := &mdformatterMetrics{}
+	m.filesProcessed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_processed_files_total",
+		Help: "The total number of processed files",
+	})
+	m.perFileLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{Name: "mdox_per_file_latency", Buckets: prometheus.DefBuckets},
+		[]string{"filepath"},
+	)
+
+	if reg != nil {
+		reg.MustRegister(m.filesProcessed, m.perFileLatency)
+	}
+	return m
+}
 
 type SourceContext struct {
 	context.Context
@@ -62,6 +85,7 @@ type Formatter struct {
 	link LinkTransformer
 	cb   CodeBlockTransformer
 
+	reg       *prometheus.Registry
 	softWraps bool
 }
 
@@ -93,6 +117,13 @@ func WithLinkTransformer(l LinkTransformer) Option {
 func WithCodeBlockTransformer(cb CodeBlockTransformer) Option {
 	return func(m *Formatter) {
 		m.cb = cb
+	}
+}
+
+// WithMetrics allows you to pass in Prometheus registry.
+func WithMetrics(reg *prometheus.Registry) Option {
+	return func(m *Formatter) {
+		m.reg = reg
 	}
 }
 
@@ -251,6 +282,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 	f := New(ctx, opts...)
 	b := bytes.Buffer{}
 	// TODO(bwplotka): Add concurrency (collector will need to redone).
+	m := newMdformatterMetrics(f.reg)
 
 	errs := merrors.New()
 	if spin != nil {
@@ -266,6 +298,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			spin.Message(fn + "...")
 		}
 		errs.Add(func() error {
+			startTime := time.Now()
+			m.filesProcessed.Inc()
+
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
 				return errors.Wrapf(err, "open %v", fn)
@@ -297,6 +332,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 			if err != nil {
 				return errors.Wrapf(err, "write %v", fn)
 			}
+			timeTaken := time.Since(startTime)
+			m.perFileLatency.WithLabelValues(fn).Observe(timeTaken.Seconds())
+
 			return file.Truncate(int64(n))
 		}())
 	}

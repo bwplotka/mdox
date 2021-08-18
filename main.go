@@ -9,8 +9,11 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
@@ -20,11 +23,16 @@ import (
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/bwplotka/mdox/pkg/version"
 	"github.com/charmbracelet/glamour"
+	"github.com/efficientgo/tools/core/pkg/errcapture"
+	"github.com/efficientgo/tools/core/pkg/logerrcapture"
 	extflag "github.com/efficientgo/tools/extkingpin"
+	"github.com/felixge/fgprof"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -66,13 +74,25 @@ func main() {
 		Default("info").Enum("error", "warn", "info", "debug")
 	logFormat := app.Flag("log.format", "Log format to use.").
 		Default(logFormatCLILog).Enum(logFormatLogfmt, logFormatJson, logFormatCLILog)
+	// Profiling and metrics.
+	profilesPath := app.Flag("profiles.path", "Path to directory where CPU and heap profiles will be saved; If empty, no profiling will be enabled.").ExistingDir()
+	metricsPath := app.Flag("metrics.path", "Path to directory where metrics are saved in OpenMetrics format; If empty, no metrics will be saved.").ExistingDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	registerFmt(ctx, app)
+	registerFmt(ctx, app, metricsPath)
 	registerTransform(ctx, app)
 
 	cmd, runner := app.Parse()
 	logger := setupLogger(*logLevel, *logFormat)
+
+	if *profilesPath != "" {
+		finalize, err := snapshotProfiles(*profilesPath)
+		if err != nil {
+			level.Error(logger).Log("err", errors.Wrapf(err, "%s profiles init failed", cmd))
+			os.Exit(1)
+		}
+		defer logerrcapture.Do(logger, finalize, "profiles")
+	}
 
 	var g run.Group
 	g.Add(func() error {
@@ -101,6 +121,66 @@ func main() {
 		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
 		os.Exit(1)
 	}
+
+}
+
+func snapshotProfiles(dir string) (func() error, error) {
+	now := time.Now().UTC()
+	if err := os.MkdirAll(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_")), os.ModePerm); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "fgprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := os.OpenFile(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "memprof.pb.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	runtime.GC()
+
+	if err := pprof.WriteHeapProfile(m); err != nil {
+		return nil, err
+	}
+
+	fgFunc := fgprof.Start(f, fgprof.FormatPprof)
+
+	return func() (err error) {
+		defer errcapture.Do(&err, f.Close, "close")
+		return fgFunc()
+	}, nil
+}
+
+// Dump metrics from registry into file in dir using OpenMetrics format.
+func Dump(reg *prometheus.Registry, dir string) error {
+	mfs, err := reg.Gather()
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	if err := os.MkdirAll(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_")), os.ModePerm); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(dir, strings.ReplaceAll(now.Format(time.UnixDate), " ", "_"), "metrics"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, mf := range mfs {
+		for _, metric := range mf.Metric {
+			unixTime := now.Unix()
+			metric.TimestampMs = &unixTime
+		}
+		if _, err := expfmt.MetricFamilyToOpenMetrics(f, mf); err != nil {
+			return err
+		}
+	}
+	if _, err = expfmt.FinalizeOpenMetrics(f); err != nil {
+		return err
+	}
+	return nil
 }
 
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
@@ -115,7 +195,7 @@ func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	}
 }
 
-func registerFmt(_ context.Context, app *extkingpin.App) {
+func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
 	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
@@ -132,6 +212,11 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
+		var reg *prometheus.Registry
+		if *metricsPath != "" {
+			reg = prometheus.NewRegistry()
+		}
+
 		var opts []mdformatter.Option
 		if !*disableGenCodeBlocksDirectives {
 			opts = append(opts, mdformatter.WithCodeBlockTransformer(mdgen.NewCodeBlockTransformer()))
@@ -161,7 +246,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if err != nil {
 				return err
 			}
-			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir)
+			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir, reg)
 			if err != nil {
 				return err
 			}
@@ -174,6 +259,8 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		if len(linkTr) > 0 {
 			opts = append(opts, mdformatter.WithLinkTransformer(linktransformer.NewChain(linkTr...)))
 		}
+
+		opts = append(opts, mdformatter.WithMetrics(reg))
 
 		if *checkOnly {
 			diff, err := mdformatter.IsFormatted(ctx, logger, *files, opts...)
@@ -197,7 +284,15 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			return errors.Errorf("files not formatted: %v", diffOut)
 
 		}
-		return mdformatter.Format(ctx, logger, *files, opts...)
+		if err := mdformatter.Format(ctx, logger, *files, opts...); err != nil {
+			return err
+		}
+		if reg != nil {
+			if err := Dump(reg, *metricsPath); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

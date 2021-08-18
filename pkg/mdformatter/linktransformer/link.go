@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +26,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/gocolly/colly/v2"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var remoteLinkPrefixRe = regexp.MustCompile(`^http[s]?://`)
@@ -35,6 +38,56 @@ var (
 	FileNotFoundErr = LookupError(errors.New("file not found"))
 	IDNotFoundErr   = LookupError(errors.New("file exists, but does not have such id"))
 )
+
+type linktransformerMetrics struct {
+	localLinksChecked  prometheus.Counter
+	remoteLinksChecked prometheus.Counter
+	roundTripLinks     prometheus.Counter
+	githubSkippedLinks prometheus.Counter
+	ignoreSkippedLinks prometheus.Counter
+
+	collyRequests         *prometheus.CounterVec
+	collyPerDomainLatency *prometheus.HistogramVec
+}
+
+func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics {
+	l := &linktransformerMetrics{}
+
+	l.localLinksChecked = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_local_links_total",
+		Help: "The total number of local links which were checked",
+	})
+	l.remoteLinksChecked = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_remote_links_total",
+		Help: "The total number of remote links which were checked",
+	})
+	l.roundTripLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_round_trip_links_total",
+		Help: "The total number of links which were roundtrip checked",
+	})
+	l.githubSkippedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_github_skipped_links_total",
+		Help: "The total number of links which were github checked",
+	})
+	l.ignoreSkippedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_ignore_skipped_links_total",
+		Help: "The total number of links which were ignore checked",
+	})
+
+	l.collyRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{Name: "mdox_colly_requests_total"},
+		[]string{},
+	)
+	l.collyPerDomainLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{Name: "mdox_colly_per_domain_latency", Buckets: prometheus.DefBuckets},
+		[]string{"domain"},
+	)
+
+	if reg != nil {
+		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
+	}
+	return l
+}
 
 const (
 	originalURLKey     = "originalURLKey"
@@ -127,6 +180,9 @@ type validator struct {
 
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
+
+	l           *linktransformerMetrics
+	transportFn func(url string) http.RoundTripper
 }
 
 type futureKey struct {
@@ -141,7 +197,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -150,6 +206,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			return nil, err
 		}
 	}
+
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
@@ -158,7 +215,24 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		remoteLinks:    map[string]error{},
 		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
 		destFutures:    map[futureKey]*futureResult{},
+		l:              &linktransformerMetrics{},
+		transportFn: func(url string) http.RoundTripper {
+			return http.DefaultTransport
+		},
 	}
+
+	v.l = newLinktransformerMetrics(reg)
+	v.transportFn = func(u string) http.RoundTripper {
+		parsed, err := url.Parse(u)
+		if err != nil {
+			panic(err)
+		}
+		return promhttp.InstrumentRoundTripperCounter(
+			v.l.collyRequests,
+			promhttp.InstrumentRoundTripperDuration(v.l.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}), http.DefaultTransport),
+		)
+	}
+
 	// Set very soft limits.
 	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
 	// on api (only search is below 100).
@@ -230,7 +304,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
 func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir)
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -290,6 +364,7 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
 	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 	if matches == nil {
+		v.l.localLinksChecked.Inc()
 		// Check if link is email address.
 		if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
 			if isValidEmail(email) {
@@ -308,6 +383,8 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 		}
 		return
 	}
+	v.l.remoteLinksChecked.Inc()
+
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {
 		matched, err := validator.IsValid(k, v)
