@@ -21,11 +21,14 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 * [#47](https://github.com/bwplotka/mdox/pull/47) Add `backMatter` support
 * [#48](https://github.com/bwplotka/mdox/pull/48) Add file line numbers to errors
 * [#49](https://github.com/bwplotka/mdox/pull/49) Add CLI spinner and colored diff
+* [#53](https://github.com/bwplotka/mdox/pull/53) Add profiling and metrics
 * [#56](https://github.com/bwplotka/mdox/pull/56) Add benchmarks
 * [#58](https://github.com/bwplotka/mdox/pull/58) Add option to preserve header (`popHeader`)
 * [#66](https://github.com/bwplotka/mdox/pull/66) Add support for email `mailto:` links
 * [#68](https://github.com/bwplotka/mdox/pull/68) Add newline check for `mdox-exec` output
 * [#69](https://github.com/bwplotka/mdox/pull/69) Add timeout option to `links.validate.config`
+* [#71](https://github.com/bwplotka/mdox/pull/71) Add `Origin.Path` to transform template
+* [#75](https://github.com/bwplotka/mdox/pull/75) Add `soft-wraps` flag to preserve soft line breaks
 
 ### Fixed
 
