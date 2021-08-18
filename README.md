@@ -18,9 +18,10 @@ Allow projects to have self-updating up-to-date documentation available in both 
   * Generating example YAML from Go configuration struct (+comments)
 * Robust and fast relative and remote link checking. (see [#link-validation-configuration](#link-validation-configuration))
 * Website integration:
-  * "Localizing" links to relative docs if specified (useful for multi-domain websites or multi-version doc).
+  * "Localizing" links to relative docs if specified (useful for multi-domain websites or multi-version doc). (see [#link-localization](#link-localization))
     * This allows smooth integration with static document websites like [Docusaurus](https://docusaurus.io/) or [hugo](https://gohugo.io) based themes!
   * Flexible pre-processing allowing easy to use GitHub experience as well as website. (see [#transform-usage](#transformation))
+* Allows profiling(using [fgprof](https://github.com/felixge/fgprof)) and exports metrics(saves to file in [OpenMetrics](https://openmetrics.io/) format) for easy debugging
 
 ## Usage
 
@@ -147,6 +148,16 @@ Relative link checking *is not* affected by this configuration, as it is expecte
 
 YAML can be passed in directly as well using `links.validate.config` flag! For more details [go.dev reference](https://pkg.go.dev/github.com/bwplotka/mdox) or [Go struct](https://github.com/bwplotka/mdox/blob/main/pkg/mdformatter/linktransformer/config.go).
 
+### Link localization
+
+It is expected for documentation to contain remote links to the project website. However, in such cases, it creates problems for multi-version docs or multi-domain websites (links would need to be updated for each version which is cumbersome). Also, it would not be navigatable locally or through GitHub(would always redirect to the website) and requires additional link checking.
+
+This is where the `links.localize.address-regex` flag comes in handy!
+
+It ensures that all HTTP(s) links that target a domain and path matching given regex will be transformed by `mdox` to relative links which are relative to anchor dir path (if exists). Also, all absolute path links will be converted to relative links to anchor dir as well.
+
+So passing in regex such as `--links.localize.address-regex="https:\/\/example\.\/.*` will allow mdox to transform links like `https://example.com/getting-started.md/` to simply `getting-started.md`.
+
 ### Transformation
 
 mdox allows various types of markdown file transformation which are useful for website pre-processing and is often required when using static site generators like Hugo. It helps in generating front/backmatter, renaming and moving files, and converts links to work on websites.
@@ -264,7 +275,7 @@ bingo get -u github.com/bwplotka/mdox
 
 ## Production Usage
 
-* [Thanos](https://github.com/bwplotka/thanos)
+* [Thanos](https://github.com/thanos-io/thanos)
 * [Observatorium](https://github.com/observatorium/observatorium)
 * [RedHat Observability Group Handbook](https://github.com/rhobs/handbook)
 * [Bingo](https://github.com/bwplotka/bingo)
@@ -278,3 +289,5 @@ Any contributions are welcome! Just use GitHub Issues and Pull Requests as usual
 ## Initial Author
 
 [@bwplotka](https://bwplotka.dev)
+
+Note: This project was a part of [GSoC'21](https://summerofcode.withgoogle.com/projects/#5053843303301120) (mentor: [@bwplotka](https://bwplotka.dev), mentee: [@saswatamcode](https://saswatamcode.tech)).
