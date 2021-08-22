@@ -30,6 +30,7 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 * [#71](https://github.com/bwplotka/mdox/pull/71) Add `Origin.Path` to transform template
 * [#75](https://github.com/bwplotka/mdox/pull/75) Add `soft-wraps` flag to preserve soft line breaks
 * [#76](https://github.com/bwplotka/mdox/pull/76) Add `linkPrefixForNonMarkdownResources` to transform config
+* [#78](https://github.com/bwplotka/mdox/pull/78) Add retry for 0 StatusCode
 
 ### Fixed
 
