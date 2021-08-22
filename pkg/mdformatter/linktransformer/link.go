@@ -284,7 +284,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 				break
 			}
 			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
-		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable:
+		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable, 0:
 			if retries > 0 {
 				break
 			}
