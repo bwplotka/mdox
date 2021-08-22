@@ -6,7 +6,7 @@ extraInputGlobs:
   - "testdata/test.md"
   - "testdata/teststatic"
 
-glueLink: "https://github.com/bwplotka/mdox/tree/main"
+linkPrefixForNonMarkdownResources: "https://github.com/bwplotka/mdox/tree/main"
 gitIgnored: true
 localLinksStyle:
   hugo:

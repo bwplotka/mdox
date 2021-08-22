@@ -244,6 +244,7 @@ As seen above,
 * `inputDir`: It's a relative (to PWD) path that assumes input directory for markdown files and assets.
 * `outputDir`: It's a relative (to PWD) output directory where you can expect all files to land in. Typically that can be a `content` dir which Hugo uses as an input.
 * `extraInputGlobs`: It allows you to bring files from outside of `inputDir`.
+* `linkPrefixForNonMarkdownResources`: It specifies the link to be glued onto relative links which don't point to markdown or image files.
 * `gitIgnored`: It specifies whether `outputDir` should be git-ignored.
 * `localLinksStyle`: It sets the linking style to be applied. If empty, mdox assumes default style.
 

@@ -74,12 +74,12 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 		logger: logger,
 
 		linkTransformer: &relLinkTransformer{
-			localLinksStyle: c.LocalLinksStyle,
-			inputDir:        c.InputDir,
-			glueLink:        c.GlueLink,
-			outputDir:       c.OutputDir,
-			oldRelPath:      map[string]string{},
-			newRelPath:      map[string]string{},
+			localLinksStyle:                   c.LocalLinksStyle,
+			inputDir:                          c.InputDir,
+			outputDir:                         c.OutputDir,
+			oldRelPath:                        map[string]string{},
+			newRelPath:                        map[string]string{},
+			linkPrefixForNonMarkdownResources: c.LinkPrefixForNonMarkdownResources,
 		},
 	}
 
@@ -269,11 +269,11 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 type relLinkTransformer struct {
 	localLinksStyle LocalLinksStyle
 
-	inputDir   string
-	outputDir  string
-	glueLink   string
-	oldRelPath map[string]string
-	newRelPath map[string]string
+	inputDir                          string
+	outputDir                         string
+	oldRelPath                        map[string]string
+	newRelPath                        map[string]string
+	linkPrefixForNonMarkdownResources string
 }
 
 func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext, destination []byte) ([]byte, error) {
@@ -307,8 +307,8 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 		}
 	}
 
-	// Non md or image relative link, so needs link to be glued.
-	if !isMDFile(relDest) && !isImgFile(relDest) && r.glueLink != "" {
+	// Non md or image relative link, so needs link to be prefixed.
+	if r.linkPrefixForNonMarkdownResources != "" && !isMDFile(relDest) && !isImgFile(relDest) {
 		workingDir, err := os.Getwd()
 		if err != nil {
 			return nil, err
@@ -328,7 +328,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 		if err != nil {
 			return nil, err
 		}
-		return []byte(r.glueLink + "/" + originalRelPath), nil
+		return []byte(r.linkPrefixForNonMarkdownResources + "/" + originalRelPath), nil
 	}
 
 	currDest := oldRelDest
