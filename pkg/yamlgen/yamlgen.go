@@ -104,14 +104,11 @@ func GenGoCode(src []byte) (string, error) {
 		jen.Qual("fmt", "Println").Call(jen.Lit("---")),
 		jen.Qual("fmt", "Println").Call(jen.Id("k")),
 		// TODO(saswatamcode): Replace with import from mdox itself once merged.
-		// jen.Qual("github.com/bwplotka/mdox/yamlgen", "Generate").Call(jen.Id("config"), jen.Qual("os", "Stderr")),
-		jen.Qual("structgen/cfggen", "Generate").Call(jen.Id("config"), jen.Qual("os", "Stderr")),
+		jen.Qual("github.com/bwplotka/mdox/pkg/yamlgen", "Generate").Call(jen.Id("config"), jen.Qual("os", "Stderr")),
 	))
 
 	// Generate main function in new module.
-	generatedCode.Func().Id("main").Params().Block(
-		init...,
-	)
+	generatedCode.Func().Id("main").Params().Block(init...)
 	return fmt.Sprintf("%#v", generatedCode), nil
 }
 
@@ -122,23 +119,6 @@ func ExecGoCode(ctx context.Context, mainGo string) ([]byte, error) {
 		return nil, err
 	}
 	defer os.RemoveAll(tmpDir)
-
-	// TODO(saswatamcode): Remove once merged.
-	// This is weird but need it for getting Generate function inside tmpDir in PR.
-	// Once merged this can be removed and can be replaced with just an import in tmpDir/main.go.
-	err = os.Mkdir(filepath.Join(tmpDir, "cfggen"), 0700)
-	if err != nil {
-		return nil, err
-	}
-	code, err := os.Create(filepath.Join(tmpDir, "cfggen/cfggen.go"))
-	if err != nil {
-		return nil, err
-	}
-	defer code.Close()
-	_, err = code.Write([]byte(cfggenFile))
-	if err != nil {
-		return nil, err
-	}
 
 	// Copy generated code to main.go.
 	main, err := os.Create(filepath.Join(tmpDir, "main.go"))
@@ -156,14 +136,22 @@ func ExecGoCode(ctx context.Context, mainGo string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "go", "mod", "init", "structgen")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "run %v", cmd)
+		return nil, errors.Wrapf(err, "mod init %v", cmd)
+	}
+
+	// Replace for unreleased mdox yamlgen so don't need to copy cfggen code to new dir and compile.
+	// Currently in github.com/saswatamcode/mdox@v0.2.2-0.20210823074517-0245f9afb0a8. Replace once #79 is merged.
+	cmd = exec.CommandContext(ctx, "go", "mod", "edit", "-replace", "github.com/bwplotka/mdox=github.com/saswatamcode/mdox@v0.2.2-0.20210823074517-0245f9afb0a8")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		return nil, errors.Wrapf(err, "mod edit %v", cmd)
 	}
 
 	// Import required packages(generate go.sum).
 	cmd = exec.CommandContext(ctx, "go", "mod", "tidy")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "run %v", cmd)
+		return nil, errors.Wrapf(err, "mod tidy %v", cmd)
 	}
 
 	// Execute generate code and return output.
@@ -178,66 +166,3 @@ func ExecGoCode(ctx context.Context, mainGo string) ([]byte, error) {
 
 	return b.Bytes(), nil
 }
-
-// TODO(saswatamcode): Remove once merged.
-// This is weird but need it for getting Generate function inside tmpDir in PR.
-// Could also do with commit hash and go.mod, but it would change on each commit in PR).
-// Once merged this can be removed and can be replaced with just an import in tmpDir/main.go.
-const cfggenFile = `package cfggen
-
-import (
-	"io"
-	"reflect"
-
-	"github.com/fatih/structtag"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v3"
-)
-
-func Generate(obj interface{}, w io.Writer) error {
-	// We forbid omitempty option. This is for simplification for doc generation.
-	if err := checkForOmitEmptyTagOption(obj); err != nil {
-		return errors.Wrap(err, "invalid type")
-	}
-	return yaml.NewEncoder(w).Encode(obj)
-}
-
-func checkForOmitEmptyTagOption(obj interface{}) error {
-	return checkForOmitEmptyTagOptionRec(reflect.ValueOf(obj))
-}
-
-func checkForOmitEmptyTagOptionRec(v reflect.Value) error {
-	switch v.Kind() {
-	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			tags, err := structtag.Parse(string(v.Type().Field(i).Tag))
-			if err != nil {
-				return errors.Wrapf(err, "%s: failed to parse tag %q", v.Type().Field(i).Name, v.Type().Field(i).Tag)
-			}
-
-			tag, err := tags.Get("yaml")
-			if err != nil {
-				return errors.Wrapf(err, "%s: failed to get tag %q", v.Type().Field(i).Name, v.Type().Field(i).Tag)
-			}
-
-			for _, opts := range tag.Options {
-				if opts == "omitempty" {
-					return errors.Errorf("omitempty is forbidden for config, but spotted on field '%s'", v.Type().Field(i).Name)
-				}
-			}
-
-			if err := checkForOmitEmptyTagOptionRec(v.Field(i)); err != nil {
-				return errors.Wrapf(err, "%s", v.Type().Field(i).Name)
-			}
-		}
-
-	case reflect.Ptr:
-		return errors.New("nil pointers are not allowed in configuration")
-
-	case reflect.Interface:
-		return checkForOmitEmptyTagOptionRec(v.Elem())
-	}
-
-	return nil
-}
-`
