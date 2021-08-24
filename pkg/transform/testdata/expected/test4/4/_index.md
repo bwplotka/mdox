@@ -1,5 +1,5 @@
 ---
-title: Group Handbook
+title: Test
 cascade:
     - _target:
         path: /**
@@ -8,12 +8,10 @@ cascade:
 
 Yolo
 
-[RelLink](Proposals/README.md)
+[RelLink](test1/_index.md/)
 
-[RelLink](Team/doc.md)
+[RelLink](team/inner/doc.md/)
 
 ![Image](logo.png)
 
 ![Image](images/logo2.png)
-
-![Outside](../test.go)
