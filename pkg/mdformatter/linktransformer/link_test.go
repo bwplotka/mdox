@@ -307,7 +307,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		))
 		testutil.NotOk(t, err)
 		testutil.Equals(t, fmt.Sprintf("%v: 2 errors: "+
-			"%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible; status code 0: Get \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\": dial tcp: lookup docs.gfoogle.com: no such host; "+
+			"%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible even after retry; status code 0: Get \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\": dial tcp: lookup docs.gfoogle.com: no such host; "+
 			"%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir+filePath, relDirPath+filePath, relDirPath+filePath), err.Error())
 	})
 
