@@ -10,7 +10,7 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
-## [v1.0.0](https://github.com/bwplotka/mdox/releases/tag/v1.0.0)
+## [v0.9.0](https://github.com/bwplotka/mdox/releases/tag/v0.9.0)
 
 ### Added
 
