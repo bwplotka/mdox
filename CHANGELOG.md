@@ -10,6 +10,8 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 
 ## Unreleased
 
+## [v0.9.0](https://github.com/bwplotka/mdox/releases/tag/v0.9.0)
+
 ### Added
 
 * [#20](https://github.com/bwplotka/mdox/pull/20) Add quotes to frontmatter
