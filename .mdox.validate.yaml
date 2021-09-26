@@ -1,4 +1,5 @@
 version: 1
+noCache: true
 
 validators:
   # Validators to skip checking PR/issue links of mdox.

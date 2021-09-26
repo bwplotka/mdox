@@ -5,6 +5,7 @@ package linktransformer
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,9 +13,11 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/testutil"
 	"github.com/go-kit/kit/log"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -368,9 +371,111 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nexplicitLocalValidators: true\n\nvalidators:\n  - regex: '^\\.\\.\\/test\\/invalid-local-links\\.md[^\\n ]*$'\n    type: 'ignore'\n"), anchorDir),
+			MustNewValidator(logger, []byte("version: 1\n\nexplicitLocalValidators: true\n\nvalidators:\n  - regex: '^\\.\\.\\/test\\/invalid-local-links\\.md[^\\n ]*$'\n    type: 'ignore'\n"), anchorDir, nil),
 		))
 
 		testutil.Ok(t, err)
+	})
+
+	t.Run("check valid link with cache", func(t *testing.T) {
+		var id int
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+
+		testStorage := &cache.Storage{
+			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest"),
+		}
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, testStorage),
+		))
+
+		testutil.Ok(t, err)
+
+		// Check if file was created.
+		_, err = os.Stat(filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest"))
+		testutil.Ok(t, err)
+
+		database, err := sql.Open("sqlite3", filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest"))
+		testutil.Ok(t, err)
+
+		err = database.Ping()
+		testutil.Ok(t, err)
+
+		// Check if url was entered into cache database.
+		statement, err := database.Prepare("SELECT id FROM visited where url = ?")
+		testutil.Ok(t, err)
+
+		row := statement.QueryRow("https://bwplotka.dev/about")
+		err = row.Scan(&id)
+		testutil.Ok(t, err)
+
+		testutil.Equals(t, 0, len(diff), diff.String())
+	})
+
+	t.Run("check valid link with no cache", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+
+		testStorage := &cache.Storage{
+			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest2"),
+		}
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte("version: 1\n\nnoCache: true"), anchorDir, testStorage),
+		))
+
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		// Check if file was created.
+		_, err = os.Stat(filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest2"))
+		testutil.NotOk(t, err)
+	})
+
+	t.Run("check 404 link with cache", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists\n"), os.ModePerm))
+		filePath := "/repo/docs/test/invalid-link.md"
+		wdir, err := os.Getwd()
+		testutil.Ok(t, err)
+		relDirPath, err := filepath.Rel(wdir, tmpDir)
+		testutil.Ok(t, err)
+
+		var id int
+		testStorage := &cache.Storage{
+			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest3"),
+		}
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, testStorage),
+		))
+		testutil.NotOk(t, err)
+
+		testutil.Equals(t, fmt.Sprintf("%v%v: %v%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", tmpDir, filePath, relDirPath, filePath), err.Error())
+
+		// Check if file was created.
+		_, err = os.Stat(filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest3"))
+		testutil.Ok(t, err)
+
+		database, err := sql.Open("sqlite3", filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest3"))
+		testutil.Ok(t, err)
+
+		err = database.Ping()
+		testutil.Ok(t, err)
+
+		// Check if url was entered into cache database.
+		statement, err := database.Prepare("SELECT id FROM visited where url = ?")
+		testutil.Ok(t, err)
+
+		row := statement.QueryRow("https://bwplotka.dev/does-not-exists")
+		err = row.Scan(&id)
+		testutil.NotOk(t, err)
+
+		testutil.Equals(t, "sql: no rows in result set", err.Error())
 	})
 }
