@@ -44,28 +44,30 @@ func (s *Storage) Init() error {
 		}
 		s.dbHandle = database
 	}
+
 	if s.ClearCache {
 		if err := s.Clear(); err != nil {
 			return err
 		}
 	}
+
 	// Create db with index.
 	statement, err := s.dbHandle.Prepare("CREATE TABLE IF NOT EXISTS visited (id INTEGER PRIMARY KEY, url TEXT, visited INT, timestamp DATETIME)")
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec()
-	if err != nil {
+	if _, err = statement.Exec(); err != nil {
 		return err
 	}
+
 	statement, err = s.dbHandle.Prepare("CREATE INDEX IF NOT EXISTS idx_visited ON visited (url)")
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec()
-	if err != nil {
+	if _, err = statement.Exec(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -73,14 +75,15 @@ func (s *Storage) Init() error {
 func (s *Storage) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	statement, err := s.dbHandle.Prepare("DROP TABLE visited")
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec()
-	if err != nil {
+	if _, err = statement.Exec(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -102,10 +105,10 @@ func (s *Storage) CacheURL(URL string) error {
 	if err != nil {
 		return err
 	}
-	_, err = statement.Exec(URL)
-	if err != nil {
+	if _, err = statement.Exec(URL); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -136,8 +139,5 @@ func (s *Storage) DeleteURL(URL string) error {
 		return err
 	}
 	_, err = statement.Exec(URL)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

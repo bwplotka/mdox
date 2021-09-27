@@ -41,11 +41,12 @@ var (
 )
 
 type linktransformerMetrics struct {
-	localLinksChecked  prometheus.Counter
-	remoteLinksChecked prometheus.Counter
-	roundTripLinks     prometheus.Counter
-	githubSkippedLinks prometheus.Counter
-	ignoreSkippedLinks prometheus.Counter
+	localLinksChecked     prometheus.Counter
+	remoteLinksChecked    prometheus.Counter
+	roundTripVisitedLinks prometheus.Counter
+	roundTripCachedLinks  prometheus.Counter
+	githubSkippedLinks    prometheus.Counter
+	ignoreSkippedLinks    prometheus.Counter
 
 	collyRequests         *prometheus.CounterVec
 	collyPerDomainLatency *prometheus.HistogramVec
@@ -62,9 +63,13 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 		Name: "mdox_remote_links_total",
 		Help: "The total number of remote links which were checked",
 	})
-	l.roundTripLinks = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "mdox_round_trip_links_total",
+	l.roundTripVisitedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_round_trip_visited_links_total",
 		Help: "The total number of links which were roundtrip checked",
+	})
+	l.roundTripCachedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_round_trip_cached_links_total",
+		Help: "The total number of links which cached in SQLite db",
 	})
 	l.githubSkippedLinks = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "mdox_github_skipped_links_total",
@@ -85,7 +90,7 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 	)
 
 	if reg != nil {
-		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
+		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripVisitedLinks, l.roundTripCachedLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
 	}
 	return l
 }
@@ -265,8 +270,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	if !v.validateConfig.NoCache && storage != nil {
 		v.storage = storage
 		v.storage.Validity = v.validateConfig.CacheValidity
-		err = v.storage.Init()
-		if err != nil {
+		if err = v.storage.Init(); err != nil {
 			return nil, err
 		}
 	}

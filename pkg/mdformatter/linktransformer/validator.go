@@ -40,7 +40,6 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 		return r.checkLocal(k), nil
 	}
 
-	r.l.roundTripLinks.Inc()
 	// Result will be in future.
 	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }
 	r.rMu.RLock()
@@ -57,13 +56,16 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 		return true, nil
 	}
 
-	r.c.WithTransport(r.transportFn(k.dest))
 	if r.storage != nil {
 		// Check if URL is already in cache database.
 		if ok, err := r.storage.IsCached(k.dest); ok && err == nil {
+			r.l.roundTripCachedLinks.Inc()
 			return true, nil
 		}
 	}
+
+	r.l.roundTripVisitedLinks.Inc()
+	r.c.WithTransport(r.transportFn(k.dest))
 	if err := r.c.Visit(k.dest); err != nil {
 		r.remoteLinks[k.dest] = errors.Wrapf(err, "remote link %v", k.dest)
 		return false, nil
