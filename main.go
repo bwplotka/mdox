@@ -42,7 +42,7 @@ const (
 	logFormatJson   = "json"
 	logFormatCLILog = "clilog"
 
-	cacheFile = "mdoxcache"
+	cacheFile = ".mdoxcache"
 )
 
 func setupLogger(logLevel, logFormat string) log.Logger {
@@ -213,7 +213,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
 
-	clearCache := cmd.Flag("cache.clear", "If true, entire cache database will be dropped").Bool()
+	clearCache := cmd.Flag("cache.clear", "If true, entire cache database will be dropped. Useful in case mdox cache needs to be cleared immediately from GitHub Actions or other CI runner cache.").Bool()
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var reg *prometheus.Registry

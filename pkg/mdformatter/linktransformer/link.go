@@ -267,7 +267,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.c.SetRequestTimeout(config.timeout)
 	}
 
-	if !v.validateConfig.NoCache && storage != nil {
+	if v.validateConfig.CacheType == sqlite && storage != nil {
 		v.storage = storage
 		v.storage.Validity = v.validateConfig.CacheValidity
 		if err = v.storage.Init(); err != nil {

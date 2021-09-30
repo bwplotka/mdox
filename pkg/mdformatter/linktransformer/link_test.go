@@ -387,7 +387,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		}
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("cacheType: 'SQLite'"), anchorDir, testStorage),
 		))
 
 		testutil.Ok(t, err)
@@ -422,7 +422,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		}
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\nnoCache: true"), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("version: 1\n\ncacheType: 'None'"), anchorDir, testStorage),
 		))
 
 		testutil.Ok(t, err)
@@ -452,7 +452,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("cacheType: 'SQLite'"), anchorDir, testStorage),
 		))
 		testutil.NotOk(t, err)
 

@@ -20,7 +20,7 @@ import (
 type Config struct {
 	Version int
 
-	NoCache       bool          `yaml:"noCache"`
+	CacheType     string        `yaml:"cacheType"`
 	CacheValidity time.Duration `yaml:"cacheValidity"`
 
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
@@ -72,6 +72,9 @@ const (
 
 const (
 	gitHubAPIURL = "https://api.github.com/repos/%v/%v?sort=created&direction=desc&per_page=1"
+
+	none   = "None"
+	sqlite = "SQLite"
 )
 
 type GitHubResponse struct {
@@ -108,6 +111,12 @@ func ParseConfig(c []byte) (Config, error) {
 
 	if cfg.Parallelism < 0 {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
+	}
+
+	switch cfg.CacheType {
+	case none, sqlite, "":
+	default:
+		return Config{}, errors.New("unsupported cacheType")
 	}
 
 	if len(cfg.Validators) <= 0 {
