@@ -277,6 +277,8 @@ bingo get -u github.com/bwplotka/mdox
 ## Production Usage
 
 * [Thanos](https://github.com/thanos-io/thanos)
+* [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator)
+* [kube-prometheus](https://github.com/prometheus-operator/kube-prometheus)
 * [Observatorium](https://github.com/observatorium/observatorium)
 * [RedHat Observability Group Handbook](https://github.com/rhobs/handbook)
 * [Bingo](https://github.com/bwplotka/bingo)
