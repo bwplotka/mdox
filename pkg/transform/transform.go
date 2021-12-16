@@ -496,6 +496,7 @@ func getFirstHeader(path string, popHeader bool) (_ string, rest []byte, err err
 	for scanner.Scan() {
 		text := scanner.Text()
 		if strings.HasPrefix(text, "#") {
+			text = strings.Replace(text, `"`, `'`, -1)
 			if !popHeader {
 				return strings.TrimPrefix(text, "# "), rest, scanner.Err()
 			}

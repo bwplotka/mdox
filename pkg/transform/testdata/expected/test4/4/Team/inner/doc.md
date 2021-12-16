@@ -1,6 +1,6 @@
 ---
 yolo: yolo
-title: Some Doc
+title: Some Doc ('Some Doc')
 slug: doc.md
 ---
 

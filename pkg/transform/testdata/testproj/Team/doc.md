@@ -1,4 +1,4 @@
-# Some Doc
+# Some Doc ("Some Doc")
 
 [RelLink](#some-doc)
 
