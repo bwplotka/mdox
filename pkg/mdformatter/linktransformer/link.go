@@ -207,6 +207,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		}
 	}
 
+	linktransformerMetrics := newLinktransformerMetrics(reg)
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
@@ -215,22 +216,30 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		remoteLinks:    map[string]error{},
 		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
 		destFutures:    map[futureKey]*futureResult{},
-		l:              &linktransformerMetrics{},
-		transportFn: func(url string) http.RoundTripper {
-			return http.DefaultTransport
-		},
-	}
+		l:              linktransformerMetrics,
+		transportFn: func(u string) http.RoundTripper {
+			parsed, err := url.Parse(u)
+			if err != nil {
+				panic(err)
+			}
+			transport := &http.Transport{
+				Proxy:                 http.ProxyFromEnvironment,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
+				Dial: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+			}
 
-	v.l = newLinktransformerMetrics(reg)
-	v.transportFn = func(u string) http.RoundTripper {
-		parsed, err := url.Parse(u)
-		if err != nil {
-			panic(err)
-		}
-		return promhttp.InstrumentRoundTripperCounter(
-			v.l.collyRequests,
-			promhttp.InstrumentRoundTripperDuration(v.l.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}), http.DefaultTransport),
-		)
+			return promhttp.InstrumentRoundTripperCounter(
+				linktransformerMetrics.collyRequests,
+				promhttp.InstrumentRoundTripperDuration(
+					linktransformerMetrics.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}),
+					transport,
+				),
+			)
+		},
 	}
 
 	// Set very soft limits.
