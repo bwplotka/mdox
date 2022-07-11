@@ -220,10 +220,10 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 10 * time.Second,
 		ExpectContinueTimeout: 5 * time.Second,
-		Dial: (&net.Dialer{
+		DialContext: (&net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
-		}).Dial,
+		}).DialContext,
 	}
 	v := &validator{
 		logger:         logger,
