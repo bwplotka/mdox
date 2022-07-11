@@ -208,13 +208,30 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
+	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx), colly.MaxDepth(1))
+	collector.SetClient(&http.Client{
+		Timeout: 30 * time.Second,
+	})
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+		ExpectContinueTimeout: 5 * time.Second,
+		Dial: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+	}
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		c:              collector,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
 		transportFn: func(u string) http.RoundTripper {
@@ -222,16 +239,6 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			if err != nil {
 				panic(err)
 			}
-			transport := &http.Transport{
-				Proxy:                 http.ProxyFromEnvironment,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ResponseHeaderTimeout: 10 * time.Second,
-				Dial: (&net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-			}
-
 			return promhttp.InstrumentRoundTripperCounter(
 				linktransformerMetrics.collyRequests,
 				promhttp.InstrumentRoundTripperDuration(
@@ -250,7 +257,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 	if err := v.c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 100,
+		Parallelism: 10,
+		RandomDelay: 1 * time.Second,
 	}); err != nil {
 		return nil, err
 	}
