@@ -37,24 +37,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	matches := remoteLinkPrefixRe.FindAllStringIndex(k.dest, 1)
 	if matches == nil && r.validateConfig.ExplicitLocalValidators {
 		r.l.localLinksChecked.Inc()
-		// Check if link is email address.
-		if email := strings.TrimPrefix(k.dest, "mailto:"); email != k.dest {
-			if isValidEmail(email) {
-				return true, nil
-			}
-			r.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
-			return false, nil
-		}
-
-		// Relative or absolute path. Check if exists.
-		newDest := absLocalLink(r.anchorDir, k.filepath, k.dest)
-
-		// Local link. Check if exists.
-		if err := r.localLinks.Lookup(newDest); err != nil {
-			r.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", k.dest) }
-			return false, nil
-		}
-		return true, nil
+		return r.checkLocal(k), nil
 	}
 
 	r.l.roundTripLinks.Inc()
