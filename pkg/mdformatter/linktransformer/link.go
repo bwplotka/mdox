@@ -387,28 +387,30 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 		return
 	}
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
-	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
-	if matches == nil {
-		v.l.localLinksChecked.Inc()
-		// Check if link is email address.
-		if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
-			if isValidEmail(email) {
+	if !v.validateConfig.ExplicitLocalValidators {
+		matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
+		if matches == nil {
+			v.l.localLinksChecked.Inc()
+			// Check if link is email address.
+			if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
+				if isValidEmail(email) {
+					return
+				}
+				v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", dest) }
 				return
 			}
-			v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", dest) }
+
+			// Relative or absolute path. Check if exists.
+			newDest := absLocalLink(v.anchorDir, filepath, dest)
+
+			// Local link. Check if exists.
+			if err := v.localLinks.Lookup(newDest); err != nil {
+				v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
+			}
 			return
 		}
-
-		// Relative or absolute path. Check if exists.
-		newDest := absLocalLink(v.anchorDir, filepath, dest)
-
-		// Local link. Check if exists.
-		if err := v.localLinks.Lookup(newDest); err != nil {
-			v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
-		}
-		return
+		v.l.remoteLinksChecked.Inc()
 	}
-	v.l.remoteLinksChecked.Inc()
 
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {

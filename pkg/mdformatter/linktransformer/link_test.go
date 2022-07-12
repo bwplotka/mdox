@@ -354,4 +354,23 @@ func TestValidator_TransformDestination(t *testing.T) {
 		))
 		testutil.Ok(t, err)
 	})
+
+	t.Run("check invalid local links with ignore validate config", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
+		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
+
+[1](.) [2](#yolo) [3](../test/invalid-local-links.md#wrong) [4](../test/invalid-local-links.md#not-yolo)
+`), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte("version: 1\n\nexplicitLocalValidators: true\n\nvalidators:\n  - regex: '^\\.\\.\\/test\\/invalid-local-links\\.md[^\\n ]*$'\n    type: 'ignore'\n"), anchorDir),
+		))
+
+		testutil.Ok(t, err)
+	})
 }
