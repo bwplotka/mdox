@@ -208,10 +208,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
-	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx), colly.MaxDepth(1))
-	collector.SetClient(&http.Client{
-		Timeout: 30 * time.Second,
-	})
+	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx))
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
