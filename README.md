@@ -125,20 +125,30 @@ For example,
 
 ```yaml mdox-exec="cat examples/.mdox.validate.yaml"
 version: 1
+timeout: "1m"
+parallelism: 100
+host_max_conns: 2
+random_delay: "1s"
 
 validators:
   - regex: '(^http[s]?:\/\/)(www\.)?(github\.com\/)bwplotka\/mdox(\/pull\/|\/issues\/)'
-    type: 'githubPullsIssues'
+    type: "githubPullsIssues"
 
-  - regex: 'localhost'
-    type: 'ignore'
+  - regex: "localhost"
+    type: "ignore"
 
   - regex: 'thanos\.io'
-    type: 'roundtrip'
-
+    type: "roundtrip"
 ```
 
-As seen above, mdox supports passing an array of link validators with types and regexes. There are three types of validators,
+As seen above, mdox supports validate configuration supports a few parameters and passing an array of link validators with types and regexes. The supported configuration parameters are:
+
+* `timeout`: The HTTP client's timeout.
+* `parallelism`: The maximum amount of concurrent HTTP requests.
+* `host_max_conns`: The maximum amount of HTTP connections open per host.
+* `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s".
+
+There are three types of validators:
 
 * `ignore`: This type of validator makes sure that `mdox` does not check links with provided regex. This is the most common use case.
 * `githubPullsIssues`: This is a smart validator which only accepts a specific type of regex of the form `(^http[s]?:\/\/)(www\.)?(github\.com\/){ORG}\/{REPO}(\/pull\/|\/issues\/)`. It performs smart validation on GitHub PR and issues links, by fetching GitHub API to get the latest pull/issue number and matching regex. This makes sure that mdox doesn't get rate limited by GitHub, even when checking a large number of GitHub links(which is pretty common in documentation)!
