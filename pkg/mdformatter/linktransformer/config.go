@@ -20,10 +20,16 @@ import (
 type Config struct {
 	Version int
 
-	Validators []ValidatorConfig `yaml:"validators"`
-	Timeout    string            `yaml:"timeout"`
+	Validators  []ValidatorConfig `yaml:"validators"`
+	Timeout     string            `yaml:"timeout"`
+	Parallelism int               `yaml:"parallelism"`
+	// HostMaxConns has to be a pointer because a zero value means no limits
+	// and we have to tell apart 0 from not-present configurations.
+	HostMaxConns *int   `yaml:"host_max_conns"`
+	RandomDelay  string `yaml:"random_delay"`
 
-	timeout time.Duration
+	timeout     time.Duration
+	randomDelay time.Duration
 }
 
 type ValidatorConfig struct {
@@ -82,6 +88,18 @@ func ParseConfig(c []byte) (Config, error) {
 		if err != nil {
 			return Config{}, errors.Wrap(err, "parsing timeout duration")
 		}
+	}
+
+	if cfg.RandomDelay != "" {
+		var err error
+		cfg.randomDelay, err = time.ParseDuration(cfg.RandomDelay)
+		if err != nil {
+			return Config{}, errors.Wrap(err, "parsing random delay duration")
+		}
+	}
+
+	if cfg.Parallelism < 0 {
+		return Config{}, errors.New("parsing parallelism, has to be > 0")
 	}
 
 	if len(cfg.Validators) <= 0 {

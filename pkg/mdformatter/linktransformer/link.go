@@ -207,30 +207,46 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		}
 	}
 
+	linktransformerMetrics := newLinktransformerMetrics(reg)
+	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx))
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+		ExpectContinueTimeout: 5 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	}
+	if config.HostMaxConns != nil {
+		transport.MaxConnsPerHost = *config.HostMaxConns
+	}
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		c:              collector,
 		destFutures:    map[futureKey]*futureResult{},
-		l:              &linktransformerMetrics{},
-		transportFn: func(url string) http.RoundTripper {
-			return http.DefaultTransport
+		l:              linktransformerMetrics,
+		transportFn: func(u string) http.RoundTripper {
+			parsed, err := url.Parse(u)
+			if err != nil {
+				panic(err)
+			}
+			return promhttp.InstrumentRoundTripperCounter(
+				linktransformerMetrics.collyRequests,
+				promhttp.InstrumentRoundTripperDuration(
+					linktransformerMetrics.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}),
+					transport,
+				),
+			)
 		},
-	}
-
-	v.l = newLinktransformerMetrics(reg)
-	v.transportFn = func(u string) http.RoundTripper {
-		parsed, err := url.Parse(u)
-		if err != nil {
-			panic(err)
-		}
-		return promhttp.InstrumentRoundTripperCounter(
-			v.l.collyRequests,
-			promhttp.InstrumentRoundTripperDuration(v.l.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}), http.DefaultTransport),
-		)
 	}
 
 	// Set very soft limits.
@@ -239,10 +255,18 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
 	}
-	if err := v.c.Limit(&colly.LimitRule{
+
+	limitRule := &colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: 100,
-	}); err != nil {
+	}
+	if config.Parallelism > 0 {
+		limitRule.Parallelism = config.Parallelism
+	}
+	if config.RandomDelay != "" {
+		limitRule.RandomDelay = config.randomDelay
+	}
+	if err := v.c.Limit(limitRule); err != nil {
 		return nil, err
 	}
 	v.c.OnRequest(func(request *colly.Request) {

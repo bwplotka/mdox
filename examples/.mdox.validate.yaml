@@ -1,4 +1,8 @@
 version: 1
+timeout: '1m'
+parallelism: 100
+host_max_conns: 2
+random_delay: '1s'
 
 validators:
   - regex: '(^http[s]?:\/\/)(www\.)?(github\.com\/)bwplotka\/mdox(\/pull\/|\/issues\/)'
@@ -9,4 +13,3 @@ validators:
 
   - regex: 'thanos\.io'
     type: 'roundtrip'
-
