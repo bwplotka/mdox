@@ -32,8 +32,14 @@ func (v GitHubPullsIssuesValidator) IsValid(k futureKey, r *validator) (bool, er
 	return false, nil
 }
 
-// RoundTripValidator.IsValid returns true if url is checked by colly.
+// RoundTripValidator.IsValid returns true if url is checked by colly or it is a valid local link.
 func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
+	matches := remoteLinkPrefixRe.FindAllStringIndex(k.dest, 1)
+	if matches == nil && r.validateConfig.ExplicitLocalValidators {
+		r.l.localLinksChecked.Inc()
+		return r.checkLocal(k), nil
+	}
+
 	r.l.roundTripLinks.Inc()
 	// Result will be in future.
 	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }

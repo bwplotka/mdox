@@ -20,9 +20,10 @@ import (
 type Config struct {
 	Version int
 
-	Validators  []ValidatorConfig `yaml:"validators"`
-	Timeout     string            `yaml:"timeout"`
-	Parallelism int               `yaml:"parallelism"`
+	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
+	Validators              []ValidatorConfig `yaml:"validators"`
+	Timeout                 string            `yaml:"timeout"`
+	Parallelism             int               `yaml:"parallelism"`
 	// HostMaxConns has to be a pointer because a zero value means no limits
 	// and we have to tell apart 0 from not-present configurations.
 	HostMaxConns *int   `yaml:"host_max_conns"`

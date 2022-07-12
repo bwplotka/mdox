@@ -378,6 +378,28 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	return merr.Err()
 }
 
+func (v *validator) checkLocal(k futureKey) bool {
+	v.l.localLinksChecked.Inc()
+	// Check if link is email address.
+	if email := strings.TrimPrefix(k.dest, "mailto:"); email != k.dest {
+		if isValidEmail(email) {
+			return true
+		}
+		v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
+		return false
+	}
+
+	// Relative or absolute path. Check if exists.
+	newDest := absLocalLink(v.anchorDir, k.filepath, k.dest)
+
+	// Local link. Check if exists.
+	if err := v.localLinks.Lookup(newDest); err != nil {
+		v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", k.dest) }
+		return false
+	}
+	return true
+}
+
 func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.futureMu.Lock()
 	defer v.futureMu.Unlock()
@@ -387,28 +409,14 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 		return
 	}
 	v.destFutures[k] = &futureResult{cases: 1, resultFn: func() error { return nil }}
-	matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
-	if matches == nil {
-		v.l.localLinksChecked.Inc()
-		// Check if link is email address.
-		if email := strings.TrimPrefix(dest, "mailto:"); email != dest {
-			if isValidEmail(email) {
-				return
-			}
-			v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", dest) }
+	if !v.validateConfig.ExplicitLocalValidators {
+		matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
+		if matches == nil {
+			v.checkLocal(k)
 			return
 		}
-
-		// Relative or absolute path. Check if exists.
-		newDest := absLocalLink(v.anchorDir, filepath, dest)
-
-		// Local link. Check if exists.
-		if err := v.localLinks.Lookup(newDest); err != nil {
-			v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", dest) }
-		}
-		return
+		v.l.remoteLinksChecked.Inc()
 	}
-	v.l.remoteLinksChecked.Inc()
 
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {
