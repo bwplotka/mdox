@@ -222,6 +222,9 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 	}
+	if config.HostMaxConns != nil {
+		transport.MaxIdleConnsPerHost = *config.HostMaxConns
+	}
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
@@ -252,11 +255,17 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
 	}
-	if err := v.c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: 10,
-		RandomDelay: 1 * time.Second,
-	}); err != nil {
+
+	limitRule := &colly.LimitRule{
+		DomainGlob: "*",
+	}
+	if config.Parallelism != 0 {
+		limitRule.Parallelism = config.Parallelism
+	}
+	if config.RandomDelay != "" {
+		limitRule.RandomDelay = config.randomDelay
+	}
+	if err := v.c.Limit(limitRule); err != nil {
 		return nil, err
 	}
 	v.c.OnRequest(func(request *colly.Request) {
