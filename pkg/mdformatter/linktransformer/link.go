@@ -223,7 +223,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		}).DialContext,
 	}
 	if config.HostMaxConns != nil {
-		transport.MaxIdleConnsPerHost = *config.HostMaxConns
+		transport.MaxConnsPerHost = *config.HostMaxConns
 	}
 	v := &validator{
 		logger:         logger,
