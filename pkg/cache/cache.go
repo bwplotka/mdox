@@ -31,19 +31,21 @@ type Storage struct {
 }
 
 // Init initializes cache database.
-func (s *Storage) Init() error {
+func (s *Storage) Init(Validity time.Duration) error {
 	// Check if db exists.
-	if s.dbHandle == nil {
-		database, err := sql.Open(driverName, s.Filename)
-		if err != nil {
-			return errors.Wrap(err, "unable to open cache database file")
-		}
-
-		if err = database.Ping(); err != nil {
-			return errors.Wrap(err, "verify connection to cache database")
-		}
-		s.dbHandle = database
+	if s.dbHandle != nil {
+		return errors.New("dbHandle should not be pre-populated")
 	}
+
+	database, err := sql.Open(driverName, s.Filename)
+	if err != nil {
+		return errors.Wrap(err, "unable to open cache database file")
+	}
+
+	if err = database.Ping(); err != nil {
+		return errors.Wrap(err, "verify connection to cache database")
+	}
+	s.dbHandle = database
 
 	if s.ClearCache {
 		if err := s.Clear(); err != nil {
@@ -67,6 +69,8 @@ func (s *Storage) Init() error {
 	if _, err = statement.Exec(); err != nil {
 		return err
 	}
+
+	s.Validity = Validity
 
 	return nil
 }
@@ -95,7 +99,7 @@ func (s *Storage) Close() error {
 // CacheURL inserts new URL into cache database.
 func (s *Storage) CacheURL(URL string) error {
 	// If particular URL is already inserted, then delete.
-	// Visit method will only be called if validity expires for a URL or in case of a new URL.
+	// CacheURL method will only be called if validity expires for a URL or in case of a new URL.
 	if err := s.DeleteURL(URL); err != nil {
 		return err
 	}

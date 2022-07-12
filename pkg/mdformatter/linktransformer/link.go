@@ -206,11 +206,7 @@ type futureResult struct {
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
 func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
 	var err error
-	defaultValidity, err := time.ParseDuration("120h")
-	if err != nil {
-		return nil, err
-	}
-	config := Config{CacheValidity: defaultValidity}
+	config := Config{}
 	if string(linksValidateConfig) != "" {
 		config, err = ParseConfig(linksValidateConfig)
 		if err != nil {
@@ -267,10 +263,9 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.c.SetRequestTimeout(config.timeout)
 	}
 
-	if v.validateConfig.CacheType == sqlite && storage != nil {
+	if v.validateConfig.CacheType != none && storage != nil {
 		v.storage = storage
-		v.storage.Validity = v.validateConfig.CacheValidity
-		if err = v.storage.Init(); err != nil {
+		if err = v.storage.Init(v.validateConfig.CacheValidity); err != nil {
 			return nil, err
 		}
 	}
@@ -297,8 +292,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
 		if v.storage != nil {
-			err := v.storage.CacheURL(response.Ctx.Get(originalURLKey))
-			if err != nil {
+			if err := v.storage.CacheURL(response.Ctx.Get(originalURLKey)); err != nil {
 				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link not saved to cache %v", response.Ctx.Get(originalURLKey))
 			}
 		}

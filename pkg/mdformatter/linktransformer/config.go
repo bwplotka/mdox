@@ -75,6 +75,8 @@ const (
 
 	none   = "None"
 	sqlite = "SQLite"
+
+	defaultValidity = time.Duration(432000000000000)
 )
 
 type GitHubResponse struct {
@@ -82,10 +84,6 @@ type GitHubResponse struct {
 }
 
 func ParseConfig(c []byte) (Config, error) {
-	defaultValidity, err := time.ParseDuration("120h")
-	if err != nil {
-		return Config{}, errors.Wrapf(err, "parsing default validity %q", string(c))
-	}
 	cfg := Config{CacheValidity: defaultValidity}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
