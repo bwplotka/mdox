@@ -257,7 +257,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	limitRule := &colly.LimitRule{
-		DomainGlob: "*",
+		DomainGlob:  "*",
+		Parallelism: 100,
 	}
 	if config.Parallelism != 0 {
 		limitRule.Parallelism = config.Parallelism

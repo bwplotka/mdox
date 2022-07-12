@@ -43,11 +43,11 @@ Flags:
       --version                  Show application version.
       --log.level=info           Log filtering level.
       --log.format=clilog        Log format to use.
-      --profiles.path=PROFILES.PATH  
+      --profiles.path=PROFILES.PATH
                                  Path to directory where CPU and heap profiles
                                  will be saved; If empty, no profiling will be
                                  enabled.
-      --metrics.path=METRICS.PATH  
+      --metrics.path=METRICS.PATH
                                  Path to directory where metrics are saved in
                                  OpenMetrics format; If empty, no metrics will
                                  be saved.
@@ -58,26 +58,26 @@ Flags:
       --code.disable-directives  If false, fmt will parse custom fenced code
                                  directives prefixed with 'mdox-gen' to
                                  autogenerate code snippets. For example:
-                                 
+
                                    ```<lang> mdox-exec="<executable + arguments>"
-                                 
+
                                  This directive runs executable with arguments
                                  and put its stderr and stdout output inside
                                  code block content, replacing existing one.
       --anchor-dir=ANCHOR-DIR    Anchor directory for all transformers. PWD is
                                  used if flag is not specified.
-      --links.localize.address-regex=LINKS.LOCALIZE.ADDRESS-REGEX  
+      --links.localize.address-regex=LINKS.LOCALIZE.ADDRESS-REGEX
                                  If specified, all HTTP(s) links that target a
                                  domain and path matching given regexp will be
                                  transformed to relative to anchor dir path (if
                                  exists).Absolute path links will be converted
                                  to relative links to anchor dir as well.
   -l, --links.validate           If true, all links will be validated
-      --links.validate.config-file=<file-path>  
+      --links.validate.config-file=<file-path>
                                  Path to YAML file for skipping link check, with
                                  spec defined in
                                  github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
-      --links.validate.config=<content>  
+      --links.validate.config=<content>
                                  Alternative to 'links.validate.config-file'
                                  flag (mutually exclusive). Content of YAML file
                                  for skipping link check, with spec defined in
@@ -143,10 +143,10 @@ validators:
 
 As seen above, mdox supports validate configuration supports a few parameters and passing an array of link validators with types and regexes. The supported configuration parameters are:
 
-* `timeout`: The HTTP client's timeout.
-* `parallelism`: The maximum amount of concurrent HTTP requests.
-* `host_max_conns`: The maximum amount of HTTP connections open per host.
-* `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s".
+* `timeout`: The HTTP client's timeout. Defaults to "10s".
+* `parallelism`: The maximum amount of concurrent HTTP requests. Defaults to 100.
+* `host_max_conns`: The maximum amount of HTTP connections open per host. Defaults to 2.
+* `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s". Defaults to no delay.
 
 There are three types of validators:
 
@@ -187,11 +187,11 @@ Flags:
       --version                  Show application version.
       --log.level=info           Log filtering level.
       --log.format=clilog        Log format to use.
-      --profiles.path=PROFILES.PATH  
+      --profiles.path=PROFILES.PATH
                                  Path to directory where CPU and heap profiles
                                  will be saved; If empty, no profiling will be
                                  enabled.
-      --metrics.path=METRICS.PATH  
+      --metrics.path=METRICS.PATH
                                  Path to directory where metrics are saved in
                                  OpenMetrics format; If empty, no metrics will
                                  be saved.
