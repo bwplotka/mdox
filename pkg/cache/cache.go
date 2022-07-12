@@ -24,6 +24,8 @@ type Storage struct {
 	Validity time.Duration
 	// Clear cache at start if true.
 	ClearCache bool
+	// Jitter is used to add jitter when checking cache validity. 0 by default.
+	Jitter time.Duration
 	// Database handle.
 	dbHandle *sql.DB
 	// Mutex used for clearing cache database.
@@ -31,7 +33,7 @@ type Storage struct {
 }
 
 // Init initializes cache database.
-func (s *Storage) Init(Validity time.Duration) error {
+func (s *Storage) Init(validity time.Duration, jitter time.Duration) error {
 	// Check if db exists.
 	if s.dbHandle != nil {
 		return errors.New("dbHandle should not be pre-populated")
@@ -70,7 +72,8 @@ func (s *Storage) Init(Validity time.Duration) error {
 		return err
 	}
 
-	s.Validity = Validity
+	s.Validity = validity
+	s.Jitter = jitter
 
 	return nil
 }
@@ -132,8 +135,8 @@ func (s *Storage) IsCached(URL string) (bool, error) {
 		return false, err
 	}
 
-	// Check if URL is within validity threshold.
-	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp) <= s.Validity), nil
+	// Check if URL is within validity threshold with jitter.
+	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+s.Jitter <= s.Validity), nil
 }
 
 // DeleteURL deletes a URL from cache database.

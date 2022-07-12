@@ -22,6 +22,7 @@ type Config struct {
 
 	CacheType     string        `yaml:"cacheType"`
 	CacheValidity time.Duration `yaml:"cacheValidity"`
+	CacheJitter   time.Duration `yaml:"cacheJitter"`
 
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
 	Validators              []ValidatorConfig `yaml:"validators"`

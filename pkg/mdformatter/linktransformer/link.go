@@ -265,7 +265,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 
 	if v.validateConfig.CacheType != none && storage != nil {
 		v.storage = storage
-		if err = v.storage.Init(v.validateConfig.CacheValidity); err != nil {
+		if err = v.storage.Init(v.validateConfig.CacheValidity, v.validateConfig.CacheJitter); err != nil {
 			return nil, err
 		}
 	}
