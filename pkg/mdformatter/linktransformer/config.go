@@ -98,7 +98,7 @@ func ParseConfig(c []byte) (Config, error) {
 		}
 	}
 
-	if cfg.Parallelism <= 0 {
+	if cfg.Parallelism < 0 {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
 	}
 
