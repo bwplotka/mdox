@@ -81,7 +81,8 @@ const (
 	none   = "None"
 	sqlite = "SQLite"
 
-	defaultValidity = time.Duration(432000000000000)
+	timeDay         = 24 * time.Hour
+	defaultValidity = 5 * timeDay
 )
 
 type GitHubResponse struct {

@@ -31,6 +31,8 @@ type SQLite3Storage struct {
 	dbHandle *sql.DB
 	// Mutex used for clearing cache database.
 	mu sync.RWMutex
+	// Rand for jitter.
+	r *rand.Rand
 }
 
 // Init initializes cache database.
@@ -75,6 +77,7 @@ func (s *SQLite3Storage) Init(validity time.Duration, jitter time.Duration) erro
 
 	s.Validity = validity
 	s.Jitter = jitter
+	s.r = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	return nil
 }
@@ -136,15 +139,13 @@ func (s *SQLite3Storage) IsCached(URL string) (bool, error) {
 		return false, err
 	}
 
-	// Check if URL is within validity threshold with jitter.
-	rand.Seed(time.Now().UnixNano())
-	if s.Jitter == time.Duration(0) {
-
-		// In case a custom jitter is not provided, a jitter from 0 to cache validity is used.
-		return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+time.Duration(rand.Intn(int(s.Validity))) <= s.Validity), nil
+	// Check if URL is within validity threshold with jitter (0 is no jitter provided or rand(0->jitter)).
+	jitterValue := time.Duration(0)
+	if s.Jitter != time.Duration(0) {
+		jitterValue = time.Duration(s.r.Intn(int(s.Jitter)))
 	}
 
-	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+time.Duration(rand.Intn(int(s.Jitter))) <= s.Validity), nil
+	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+jitterValue <= s.Validity), nil
 }
 
 // DeleteURL deletes a URL from cache database.
