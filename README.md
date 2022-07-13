@@ -82,6 +82,10 @@ Flags:
                                  flag (mutually exclusive). Content of YAML file
                                  for skipping link check, with spec defined in
                                  github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
+      --cache.clear              If true, entire cache database will be dropped
+                                 and rebuilt when mdox is run. Useful in case
+                                 cache needs to be cleared immediately from
+                                 GitHub Actions or other CI runner cache.
 
 Args:
   <files>  Markdown file(s) to process.

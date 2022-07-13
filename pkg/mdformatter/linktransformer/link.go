@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/tools/core/pkg/merrors"
 	"github.com/go-kit/kit/log"
@@ -40,11 +41,12 @@ var (
 )
 
 type linktransformerMetrics struct {
-	localLinksChecked  prometheus.Counter
-	remoteLinksChecked prometheus.Counter
-	roundTripLinks     prometheus.Counter
-	githubSkippedLinks prometheus.Counter
-	ignoreSkippedLinks prometheus.Counter
+	localLinksChecked     prometheus.Counter
+	remoteLinksChecked    prometheus.Counter
+	roundTripVisitedLinks prometheus.Counter
+	roundTripCachedLinks  prometheus.Counter
+	githubSkippedLinks    prometheus.Counter
+	ignoreSkippedLinks    prometheus.Counter
 
 	collyRequests         *prometheus.CounterVec
 	collyPerDomainLatency *prometheus.HistogramVec
@@ -61,9 +63,13 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 		Name: "mdox_remote_links_total",
 		Help: "The total number of remote links which were checked",
 	})
-	l.roundTripLinks = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "mdox_round_trip_links_total",
+	l.roundTripVisitedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_round_trip_visited_links_total",
 		Help: "The total number of links which were roundtrip checked",
+	})
+	l.roundTripCachedLinks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "mdox_round_trip_cached_links_total",
+		Help: "The total number of links which cached in SQLite db",
 	})
 	l.githubSkippedLinks = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "mdox_github_skipped_links_total",
@@ -84,7 +90,7 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 	)
 
 	if reg != nil {
-		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
+		reg.MustRegister(l.localLinksChecked, l.remoteLinksChecked, l.roundTripVisitedLinks, l.roundTripCachedLinks, l.githubSkippedLinks, l.ignoreSkippedLinks, l.collyRequests, l.collyPerDomainLatency)
 	}
 	return l
 }
@@ -177,6 +183,7 @@ type validator struct {
 	rMu         sync.RWMutex
 	remoteLinks map[string]error
 	c           *colly.Collector
+	storage     *cache.SQLite3Storage
 
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
@@ -197,7 +204,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -208,7 +215,6 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
-	collector := colly.NewCollector(colly.Async(), colly.StdlibContext(ctx))
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
@@ -231,7 +237,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              collector,
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		storage:        nil,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
 		transportFn: func(u string) http.RoundTripper {
@@ -256,6 +263,13 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.c.SetRequestTimeout(config.timeout)
 	}
 
+	if v.validateConfig.Cache.Type != none && storage != nil {
+		v.storage = storage
+		if err = v.storage.Init(v.validateConfig.Cache.Validity, v.validateConfig.Cache.Jitter); err != nil {
+			return nil, err
+		}
+	}
+
 	limitRule := &colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: 100,
@@ -277,6 +291,11 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	v.c.OnScraped(func(response *colly.Response) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
+		if v.storage != nil {
+			if err := v.storage.CacheURL(response.Ctx.Get(originalURLKey)); err != nil {
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link not saved to cache %v", response.Ctx.Get(originalURLKey))
+			}
+		}
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = nil
 	})
 	v.c.OnError(func(response *colly.Response, err error) {
@@ -328,8 +347,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string) mdformatter.LinkTransformer {
-	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, nil)
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage) mdformatter.LinkTransformer {
+	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, storage, nil)
 	if err != nil {
 		panic(err)
 	}

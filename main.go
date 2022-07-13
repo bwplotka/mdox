@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
@@ -40,6 +41,8 @@ const (
 	logFormatLogfmt = "logfmt"
 	logFormatJson   = "json"
 	logFormatCLILog = "clilog"
+
+	cacheFile = ".mdoxcache"
 )
 
 func setupLogger(logLevel, logFormat string) log.Logger {
@@ -207,9 +210,10 @@ This directive runs executable with arguments and put its stderr and stdout outp
 	anchorDir := cmd.Flag("anchor-dir", "Anchor directory for all transformers. PWD is used if flag is not specified.").ExistingDir()
 	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists)."+
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
-	// TODO(bwplotka): Add cache in file?
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
+
+	clearCache := cmd.Flag("cache.clear", "If true, entire cache database will be dropped and rebuilt when mdox is run. Useful in case cache needs to be cleared immediately from GitHub Actions or other CI runner cache.").Bool()
 
 	cmd.Run(func(ctx context.Context, logger log.Logger) (err error) {
 		var reg *prometheus.Registry
@@ -242,11 +246,19 @@ This directive runs executable with arguments and put its stderr and stdout outp
 
 		var linkTr []mdformatter.LinkTransformer
 		if *linksValidateEnabled {
+			var storage *cache.SQLite3Storage
+
 			validateConfigContent, err := linksValidateConfig.Content()
 			if err != nil {
 				return err
 			}
-			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir, reg)
+
+			storage = &cache.SQLite3Storage{
+				Filename:   cacheFile,
+				ClearCache: *clearCache,
+			}
+
+			v, err := linktransformer.NewValidator(ctx, logger, validateConfigContent, anchorDir, storage, reg)
 			if err != nil {
 				return err
 			}

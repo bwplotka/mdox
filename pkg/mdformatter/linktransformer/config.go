@@ -20,6 +20,8 @@ import (
 type Config struct {
 	Version int
 
+	Cache CacheConfig `yaml:"cache"`
+
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
 	Validators              []ValidatorConfig `yaml:"validators"`
 	Timeout                 string            `yaml:"timeout"`
@@ -31,6 +33,12 @@ type Config struct {
 
 	timeout     time.Duration
 	randomDelay time.Duration
+}
+
+type CacheConfig struct {
+	Type     string        `yaml:"type"`
+	Validity time.Duration `yaml:"validity"`
+	Jitter   time.Duration `yaml:"jitter"`
 }
 
 type ValidatorConfig struct {
@@ -69,6 +77,12 @@ const (
 
 const (
 	gitHubAPIURL = "https://api.github.com/repos/%v/%v?sort=created&direction=desc&per_page=1"
+
+	none   = "None"
+	sqlite = "SQLite"
+
+	timeDay         = 24 * time.Hour
+	defaultValidity = 5 * timeDay
 )
 
 type GitHubResponse struct {
@@ -76,7 +90,7 @@ type GitHubResponse struct {
 }
 
 func ParseConfig(c []byte) (Config, error) {
-	cfg := Config{}
+	cfg := Config{Cache: CacheConfig{Validity: defaultValidity}}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
@@ -103,8 +117,14 @@ func ParseConfig(c []byte) (Config, error) {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
 	}
 
+	switch cfg.Cache.Type {
+	case none, sqlite, "":
+	default:
+		return Config{}, errors.New("unsupported cache type")
+	}
+
 	if len(cfg.Validators) <= 0 {
-		return Config{}, errors.New("No validator provided")
+		return cfg, nil
 	}
 
 	// Evaluate regex for given validators.

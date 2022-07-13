@@ -49,7 +49,7 @@ func benchLinktransformer(b *testing.B) {
 	testutil.Ok(b, err)
 	defer file.Close()
 
-	f := mdformatter.New(context.Background(), mdformatter.WithLinkTransformer(MustNewValidator(logger, []byte(""), anchorDir)))
+	f := mdformatter.New(context.Background(), mdformatter.WithLinkTransformer(MustNewValidator(logger, []byte(""), anchorDir, nil)))
 	b.ResetTimer()
 	b.Run("Validator", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
