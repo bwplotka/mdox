@@ -382,12 +382,12 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
-		testStorage := &cache.Storage{
+		testStorage := &cache.SQLite3Storage{
 			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest"),
 		}
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("cacheType: 'SQLite'"), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("version: 1\n\ncache:\n  type: 'SQLite'"), anchorDir, testStorage),
 		))
 
 		testutil.Ok(t, err)
@@ -417,12 +417,12 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
 		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
-		testStorage := &cache.Storage{
+		testStorage := &cache.SQLite3Storage{
 			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest2"),
 		}
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\ncacheType: 'None'"), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("version: 1\n\ncache:\n  type: 'None'"), anchorDir, testStorage),
 		))
 
 		testutil.Ok(t, err)
@@ -443,7 +443,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Ok(t, err)
 
 		var id int
-		testStorage := &cache.Storage{
+		testStorage := &cache.SQLite3Storage{
 			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest3"),
 		}
 
@@ -452,7 +452,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("cacheType: 'SQLite'"), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("version: 1\n\ncache:\n  type: 'SQLite'"), anchorDir, testStorage),
 		))
 		testutil.NotOk(t, err)
 

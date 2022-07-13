@@ -246,14 +246,14 @@ This directive runs executable with arguments and put its stderr and stdout outp
 
 		var linkTr []mdformatter.LinkTransformer
 		if *linksValidateEnabled {
-			var storage *cache.Storage
+			var storage *cache.SQLite3Storage
 
 			validateConfigContent, err := linksValidateConfig.Content()
 			if err != nil {
 				return err
 			}
 
-			storage = &cache.Storage{
+			storage = &cache.SQLite3Storage{
 				Filename:   cacheFile,
 				ClearCache: *clearCache,
 			}

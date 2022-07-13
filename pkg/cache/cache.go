@@ -5,6 +5,7 @@ package cache
 
 import (
 	"database/sql"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -16,9 +17,9 @@ const (
 	driverName = "sqlite3"
 )
 
-// Storage implements a SQLite3 caching backend for Colly.
-type Storage struct {
-	// Sqlite filename.
+// Sqlite3Storage implements a SQLite3 caching backend for Colly.
+type SQLite3Storage struct {
+	// SQLite filename.
 	Filename string
 	// Duration till which a link is skipped.
 	Validity time.Duration
@@ -33,7 +34,7 @@ type Storage struct {
 }
 
 // Init initializes cache database.
-func (s *Storage) Init(validity time.Duration, jitter time.Duration) error {
+func (s *SQLite3Storage) Init(validity time.Duration, jitter time.Duration) error {
 	// Check if db exists.
 	if s.dbHandle != nil {
 		return errors.New("dbHandle should not be pre-populated")
@@ -79,7 +80,7 @@ func (s *Storage) Init(validity time.Duration, jitter time.Duration) error {
 }
 
 // Clear removes all entries from cache.
-func (s *Storage) Clear() error {
+func (s *SQLite3Storage) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -95,12 +96,12 @@ func (s *Storage) Clear() error {
 }
 
 // Close cache database.
-func (s *Storage) Close() error {
+func (s *SQLite3Storage) Close() error {
 	return s.dbHandle.Close()
 }
 
 // CacheURL inserts new URL into cache database.
-func (s *Storage) CacheURL(URL string) error {
+func (s *SQLite3Storage) CacheURL(URL string) error {
 	// If particular URL is already inserted, then delete.
 	// CacheURL method will only be called if validity expires for a URL or in case of a new URL.
 	if err := s.DeleteURL(URL); err != nil {
@@ -120,7 +121,7 @@ func (s *Storage) CacheURL(URL string) error {
 }
 
 // IsCached checks if URL has already been visited.
-func (s *Storage) IsCached(URL string) (bool, error) {
+func (s *SQLite3Storage) IsCached(URL string) (bool, error) {
 	var timestamp time.Time
 	statement, err := s.dbHandle.Prepare("SELECT timestamp FROM visited where url = ?")
 	if err != nil {
@@ -136,11 +137,18 @@ func (s *Storage) IsCached(URL string) (bool, error) {
 	}
 
 	// Check if URL is within validity threshold with jitter.
-	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+s.Jitter <= s.Validity), nil
+	rand.Seed(time.Now().UnixNano())
+	if s.Jitter == time.Duration(0) {
+
+		// In case a custom jitter is not provided, a jitter from 0 to cache validity is used.
+		return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+time.Duration(rand.Intn(int(s.Validity))) <= s.Validity), nil
+	}
+
+	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+time.Duration(rand.Intn(int(s.Jitter))) <= s.Validity), nil
 }
 
 // DeleteURL deletes a URL from cache database.
-func (s *Storage) DeleteURL(URL string) error {
+func (s *SQLite3Storage) DeleteURL(URL string) error {
 	statement, err := s.dbHandle.Prepare("DELETE FROM visited where url = ?")
 	if err != nil {
 		return err

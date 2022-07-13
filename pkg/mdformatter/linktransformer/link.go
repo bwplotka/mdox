@@ -183,7 +183,7 @@ type validator struct {
 	rMu         sync.RWMutex
 	remoteLinks map[string]error
 	c           *colly.Collector
-	storage     *cache.Storage
+	storage     *cache.SQLite3Storage
 
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
@@ -204,7 +204,7 @@ type futureResult struct {
 
 // NewValidator returns mdformatter.LinkTransformer that crawls all links.
 // TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
 	var err error
 	config := Config{}
 	if string(linksValidateConfig) != "" {
@@ -263,9 +263,9 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.c.SetRequestTimeout(config.timeout)
 	}
 
-	if v.validateConfig.CacheType != none && storage != nil {
+	if v.validateConfig.Cache.Type != none && storage != nil {
 		v.storage = storage
-		if err = v.storage.Init(v.validateConfig.CacheValidity, v.validateConfig.CacheJitter); err != nil {
+		if err = v.storage.Init(v.validateConfig.Cache.Validity, v.validateConfig.Cache.Jitter); err != nil {
 			return nil, err
 		}
 	}
@@ -347,7 +347,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
-func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.Storage) mdformatter.LinkTransformer {
+func MustNewValidator(logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage) mdformatter.LinkTransformer {
 	v, err := NewValidator(context.TODO(), logger, linksValidateConfig, anchorDir, storage, nil)
 	if err != nil {
 		panic(err)
