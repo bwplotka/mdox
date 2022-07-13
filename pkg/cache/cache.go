@@ -145,7 +145,7 @@ func (s *SQLite3Storage) IsCached(URL string) (bool, error) {
 		jitterValue = time.Duration(s.r.Intn(int(s.Jitter)))
 	}
 
-	return (!timestamp.IsZero() && time.Now().UTC().Sub(timestamp)+jitterValue <= s.Validity), nil
+	return (!timestamp.IsZero() && time.Since(timestamp)+jitterValue <= s.Validity), nil
 }
 
 // DeleteURL deletes a URL from cache database.
