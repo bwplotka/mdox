@@ -36,9 +36,11 @@ type Config struct {
 }
 
 type CacheConfig struct {
-	Type     string        `yaml:"type"`
-	Validity time.Duration `yaml:"validity"`
-	Jitter   time.Duration `yaml:"jitter"`
+	Type     string `yaml:"type"`
+	Validity string `yaml:"validity"`
+	Jitter   string `yaml:"jitter"`
+	validity time.Duration
+	jitter   time.Duration
 }
 
 type ValidatorConfig struct {
@@ -81,8 +83,8 @@ const (
 	none   = "None"
 	sqlite = "SQLite"
 
-	timeDay         = 24 * time.Hour
-	defaultValidity = 5 * timeDay
+	timeDay              = 24 * time.Hour
+	defaultCacheValidity = 5 * timeDay
 )
 
 type GitHubResponse struct {
@@ -90,7 +92,7 @@ type GitHubResponse struct {
 }
 
 func ParseConfig(c []byte) (Config, error) {
-	cfg := Config{Cache: CacheConfig{Validity: defaultValidity}}
+	cfg := Config{Cache: CacheConfig{Validity: defaultCacheValidity.String()}}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
@@ -118,7 +120,23 @@ func ParseConfig(c []byte) (Config, error) {
 	}
 
 	switch cfg.Cache.Type {
-	case none, sqlite, "":
+	case sqlite:
+		if cfg.Cache.Validity != "" {
+			var err error
+			cfg.Cache.validity, err = time.ParseDuration(cfg.Cache.Validity)
+			if err != nil {
+				return Config{}, errors.Wrap(err, "parsing cache validity duration")
+			}
+		}
+
+		if cfg.Cache.Jitter != "" {
+			var err error
+			cfg.Cache.jitter, err = time.ParseDuration(cfg.Cache.Jitter)
+			if err != nil {
+				return Config{}, errors.Wrap(err, "parsing cache jitter duration")
+			}
+		}
+	case none, "":
 	default:
 		return Config{}, errors.New("unsupported cache type")
 	}
