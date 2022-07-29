@@ -39,12 +39,12 @@ func NewConfig() Config {
 	}
 }
 
-// Presents tell whether a cache configuration is present.
+// Present tell whether a cache configuration is present.
 func (c *Config) Present() bool {
 	return c.Type != cacheTypeNone
 }
 
-// UnmarshalYAML puts the unmarshaled yaml data into the internal cache parser
+// UnmarshalYAML puts the unmarshalled yaml data into the internal cache parser
 // struct. This prevents access to the string data of jitter and validity.
 func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode(c.cacheParser); err != nil {
@@ -80,6 +80,7 @@ func (c *Config) load() error {
 	default:
 		return errors.New("unsupported cache type")
 	}
+	c.Type = c.cacheParser.Type
 	return nil
 }
 
