@@ -387,7 +387,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		}
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte("version: 1\n\ncache:\n  type: 'SQLite'"), anchorDir, testStorage),
+			MustNewValidator(logger, []byte("version: 1\n\ncache:\n  type: 'sqlite'"), anchorDir, testStorage),
 		))
 
 		testutil.Ok(t, err)
