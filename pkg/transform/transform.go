@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +49,7 @@ func prepOutputDir(d string, gitIgnored bool) error {
 	}
 
 	if gitIgnored {
-		if err = ioutil.WriteFile(filepath.Join(d, ".gitignore"), []byte("*"), os.ModePerm); err != nil {
+		if err = os.WriteFile(filepath.Join(d, ".gitignore"), []byte("*"), os.ModePerm); err != nil {
 			return err
 		}
 	}
@@ -199,7 +198,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 		}
 
 		if rest != nil {
-			if err := ioutil.WriteFile(target, rest, os.ModePerm); err != nil {
+			if err := os.WriteFile(target, rest, os.ModePerm); err != nil {
 				return err
 			}
 		}
@@ -503,7 +502,7 @@ func getFirstHeader(path string, popHeader bool) (_ string, rest []byte, err err
 			if _, err := file.Seek(int64(len(text)), 0); err != nil {
 				return "", nil, errors.Wrap(err, "seek")
 			}
-			rest, err := ioutil.ReadAll(file)
+			rest, err := io.ReadAll(file)
 			if err != nil {
 				return "", nil, errors.Wrap(err, "read")
 			}

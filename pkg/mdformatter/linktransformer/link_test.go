@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,13 +39,13 @@ const (
 )
 
 func TestLocalizer_TransformDestination(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test-localizer")
+	tmpDir, err := os.MkdirTemp("", "test-localizer")
 	testutil.Ok(t, err)
 	t.Cleanup(func() { testutil.Ok(t, os.RemoveAll(tmpDir)) })
 
 	testutil.Ok(t, os.MkdirAll(filepath.Join(tmpDir, "repo", "docs", "a"), os.ModePerm))
-	testutil.Ok(t, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "a", "doc.md"), []byte(testDocWithLinks), os.ModePerm))
-	testutil.Ok(t, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc2.md"), []byte(testDocWithLinks), os.ModePerm))
+	testutil.Ok(t, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "a", "doc.md"), []byte(testDocWithLinks), os.ModePerm))
+	testutil.Ok(t, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc2.md"), []byte(testDocWithLinks), os.ModePerm))
 
 	logger := log.NewLogfmtLogger(os.Stderr)
 	anchorDir := filepath.Join(tmpDir, "repo", "docs")
@@ -123,20 +122,20 @@ func TestLocalizer_TransformDestination(t *testing.T) {
 }
 
 func TestValidator_TransformDestination(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test-validator")
+	tmpDir, err := os.MkdirTemp("", "test-validator")
 	testutil.Ok(t, err)
 	t.Cleanup(func() { testutil.Ok(t, os.RemoveAll(tmpDir)) })
 
 	testutil.Ok(t, os.MkdirAll(filepath.Join(tmpDir, "repo", "docs", "a"), os.ModePerm))
 	testutil.Ok(t, os.MkdirAll(filepath.Join(tmpDir, "repo", "docs", "test"), os.ModePerm))
-	testutil.Ok(t, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "a", "doc.md"), []byte(testDocWithLinks), os.ModePerm))
-	testutil.Ok(t, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc2.md"), []byte(testDocWithLinks), os.ModePerm))
+	testutil.Ok(t, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "a", "doc.md"), []byte(testDocWithLinks), os.ModePerm))
+	testutil.Ok(t, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc2.md"), []byte(testDocWithLinks), os.ModePerm))
 
 	logger := log.NewLogfmtLogger(os.Stderr)
 	anchorDir := filepath.Join(tmpDir, "repo", "docs")
 	t.Run("check valid link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
@@ -152,8 +151,8 @@ func TestValidator_TransformDestination(t *testing.T) {
 	t.Run("check valid but same link in diff files", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
 		testFile2 := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link2.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
-		testutil.Ok(t, ioutil.WriteFile(testFile2, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile2, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile, testFile2})
 		testutil.Ok(t, err)
@@ -168,7 +167,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid local links", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
 
 [1](.) [2](#yolo) [3](../test/valid-local-links.md) [4](../test/valid-local-links.md#yolo) [5](../a/doc.md)
 `), os.ModePerm))
@@ -186,7 +185,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid local links with dash", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links-with-dash.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# Expose UI on a sub-path
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# Expose UI on a sub-path
 
 [1](#expose-ui-on-a-sub-path)
 
@@ -208,7 +207,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid local links in diff language", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links-diff-lang.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# Twój wkład w dokumentację
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# Twój wkład w dokumentację
 
 [1](#twój-wkład-w-dokumentację)
 
@@ -235,7 +234,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Ok(t, err)
 		relDirPath, err := filepath.Rel(wdir, tmpDir)
 		testutil.Ok(t, err)
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
 
 [1](.) [2](#not-yolo) [3](../test2/invalid-local-links.md) [4](../test/invalid-local-links.md#not-yolo) [5](../test/doc.md)
 `), os.ModePerm))
@@ -259,7 +258,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid email link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-email.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("[yolo](mailto:test@yahoo.com)\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[yolo](mailto:test@yahoo.com)\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
@@ -274,7 +273,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check invalid email link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-email.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("[yolo](mailto:test@mdox.com)\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[yolo](mailto:test@mdox.com)\n"), os.ModePerm))
 		filePath := "/repo/docs/test/invalid-email.md"
 		wdir, err := os.Getwd()
 		testutil.Ok(t, err)
@@ -294,7 +293,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check 404 link", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\n"), os.ModePerm))
 		filePath := "/repo/docs/test/invalid-link.md"
 		wdir, err := os.Getwd()
 		testutil.Ok(t, err)
@@ -316,7 +315,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid & 404 link with validate config", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link2.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://www.github.com/ https://bwplotka.dev/does-not-exits\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://www.github.com/ https://bwplotka.dev/does-not-exits\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
@@ -330,7 +329,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check 404 links with ignore validate config", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "links.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://fakelink1.com/ http://fakelink2.com/ https://www.fakelink3.com/\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://fakelink1.com/ http://fakelink2.com/ https://www.fakelink3.com/\n"), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
 		testutil.Ok(t, err)
@@ -344,7 +343,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check github links with validate config", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "github-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://github.com/bwplotka/mdox/issues/23 https://github.com/bwplotka/mdox/pull/32 https://github.com/bwplotka/mdox/pull/27#pullrequestreview-659598194\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://github.com/bwplotka/mdox/issues/23 https://github.com/bwplotka/mdox/pull/32 https://github.com/bwplotka/mdox/pull/27#pullrequestreview-659598194\n"), os.ModePerm))
 		// This is substituted in config using PathorContent flag. But need to pass it directly here.
 		repoToken := os.Getenv("GITHUB_TOKEN")
 
@@ -360,7 +359,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check invalid local links with ignore validate config", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte(`# yolo
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
 
 [1](.) [2](#yolo) [3](../test/invalid-local-links.md#wrong) [4](../test/invalid-local-links.md#not-yolo)
 `), os.ModePerm))
@@ -380,7 +379,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 	t.Run("check valid link with cache", func(t *testing.T) {
 		var id int
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
 		testStorage := &cache.SQLite3Storage{
 			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest"),
@@ -415,7 +414,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check valid link with no cache", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/about\n"), os.ModePerm))
 
 		testStorage := &cache.SQLite3Storage{
 			Filename: filepath.Join(tmpDir, "repo", "docs", "test", "mdoxcachetest2"),
@@ -435,7 +434,7 @@ func TestValidator_TransformDestination(t *testing.T) {
 
 	t.Run("check 404 link with cache", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-link.md")
-		testutil.Ok(t, ioutil.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists\n"), os.ModePerm))
+		testutil.Ok(t, os.WriteFile(testFile, []byte("https://bwplotka.dev/does-not-exists\n"), os.ModePerm))
 		filePath := "/repo/docs/test/invalid-link.md"
 		wdir, err := os.Getwd()
 		testutil.Ok(t, err)
