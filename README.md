@@ -55,8 +55,8 @@ Flags:
                                  instead it will fail if files needs formatting
       --soft-wraps               If true, fmt will preserve soft line breaks for
                                  given files
-      --code.disable-directives  If false, fmt will parse custom fenced code
-                                 directives prefixed with 'mdox-gen' to
+      --code.disable-directives  If false, fmt will parse custom fenced
+                                 code directives prefixed with 'mdox-gen' to
                                  autogenerate code snippets. For example:
                                  
                                    ```<lang> mdox-exec="<executable + arguments>"
@@ -74,8 +74,8 @@ Flags:
                                  to relative links to anchor dir as well.
   -l, --links.validate           If true, all links will be validated
       --links.validate.config-file=<file-path>  
-                                 Path to YAML file for skipping link check, with
-                                 spec defined in
+                                 Path to YAML file for skipping
+                                 link check, with spec defined in
                                  github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
       --links.validate.config=<content>  
                                  Alternative to 'links.validate.config-file'
@@ -199,12 +199,12 @@ Flags:
                                  Path to directory where metrics are saved in
                                  OpenMetrics format; If empty, no metrics will
                                  be saved.
-      --config-file=<file-path>  Path to Path to the YAML file with spec defined
-                                 in
+      --config-file=<file-path>  Path to Path to the YAML
+                                 file with spec defined in
                                  github.com/bwplotka/mdox/pkg/transform.Config
-      --config=<content>         Alternative to 'config-file' flag (mutually
-                                 exclusive). Content of Path to the YAML file
-                                 with spec defined in
+      --config=<content>         Alternative to 'config-file' flag
+                                 (mutually exclusive). Content of Path
+                                 to the YAML file with spec defined in
                                  github.com/bwplotka/mdox/pkg/transform.Config
 
 ```
