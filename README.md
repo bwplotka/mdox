@@ -55,6 +55,7 @@ Flags:
                                  instead it will fail if files needs formatting
       --soft-wraps               If true, fmt will preserve soft line breaks for
                                  given files
+      --no-code-fmt              If true, don't reformat code snippets
       --code.disable-directives  If false, fmt will parse custom fenced
                                  code directives prefixed with 'mdox-gen' to
                                  autogenerate code snippets. For example:

@@ -147,3 +147,35 @@ func TestCheck_SoftWraps(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Equals(t, string(exp), diff.String())
 }
+
+func TestFormatBadlyFormattedGoCode(t *testing.T) {
+	t.Run("Format WithNoCodeFmt", func(t *testing.T) {
+		file, err := os.OpenFile("testdata/badly_formatted_go_code.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file.Close()
+
+		f := New(context.Background(), WithNoCodeFmt())
+
+		exp, err := os.ReadFile("testdata/badly_formatted_go_code.md")
+		testutil.Ok(t, err)
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+
+	t.Run("Format", func(t *testing.T) {
+		file, err := os.OpenFile("testdata/badly_formatted_go_code.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file.Close()
+
+		f := New(context.Background())
+
+		exp, err := os.ReadFile("testdata/badly_formatted_go_code.reformatted.md")
+		testutil.Ok(t, err)
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+}
