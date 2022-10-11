@@ -147,3 +147,18 @@ func TestCheck_SoftWraps(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Equals(t, string(exp), diff.String())
 }
+
+func TestFormat_NoGofmt(t *testing.T) {
+	file, err := os.OpenFile("testdata/not_formatted_nogofmt.md", os.O_RDONLY, 0)
+	testutil.Ok(t, err)
+	defer file.Close()
+
+	f := New(context.Background(), WithNoGofmt())
+
+	exp, err := os.ReadFile("testdata/not_formatted_nogofmt.md")
+	testutil.Ok(t, err)
+
+	buf := bytes.Buffer{}
+	testutil.Ok(t, f.Format(file, &buf))
+	testutil.Equals(t, string(exp), buf.String())
+}

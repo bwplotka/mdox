@@ -83,9 +83,10 @@ type Formatter struct {
 	bm   BackMatterTransformer
 	link LinkTransformer
 	cb   CodeBlockTransformer
+	reg  *prometheus.Registry
 
-	reg       *prometheus.Registry
 	softWraps bool
+	noGofmt   bool
 }
 
 // Option is a functional option type for Formatter objects.
@@ -130,6 +131,13 @@ func WithMetrics(reg *prometheus.Registry) Option {
 func WithSoftWraps() Option {
 	return func(m *Formatter) {
 		m.softWraps = true
+	}
+}
+
+// WithNoGofmt specifies that we shouldn't reformat Go code snippets.
+func WithNoGofmt() Option {
+	return func(m *Formatter) {
+		m.noGofmt = true
 	}
 }
 
@@ -394,6 +402,11 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	renderer := markdown.NewRenderer()
 	if f.softWraps {
 		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
+	}
+	if f.noGofmt {
+		// If --no-gofmt is set, clear out the list of code formatters
+		// used by the renderer.
+		renderer.AddMarkdownOptions(markdown.WithCodeFormatters())
 	}
 	tr := &transformer{
 		wrapped:   renderer,
