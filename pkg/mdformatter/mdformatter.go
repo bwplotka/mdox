@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"time"
@@ -317,7 +316,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 					return err
 				}
 
-				in, err := ioutil.ReadAll(file)
+				in, err := io.ReadAll(file)
 				if err != nil {
 					return errors.Wrapf(err, "read all %v", fn)
 				}
@@ -351,7 +350,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		Filepath: file.Name(),
 	}
 
-	b, err := ioutil.ReadAll(file)
+	b, err := io.ReadAll(file)
 	if err != nil {
 		return errors.Wrapf(err, "read %v", file.Name())
 	}
