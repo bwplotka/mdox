@@ -153,7 +153,7 @@ func TestFormat_NoGofmt(t *testing.T) {
 	testutil.Ok(t, err)
 	defer file.Close()
 
-	f := New(context.Background(), WithNoGofmt())
+	f := New(context.Background(), WithNoCodeFmt())
 
 	exp, err := os.ReadFile("testdata/not_formatted_nogofmt.md")
 	testutil.Ok(t, err)
