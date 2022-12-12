@@ -395,6 +395,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	if f.softWraps {
 		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
 	}
+	renderer.AddMarkdownOptions(markdown.WithCodeFormatters(markdown.GoCodeFormatter))
 	tr := &transformer{
 		wrapped:   renderer,
 		sourceCtx: sourceCtx,
