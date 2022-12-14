@@ -11,7 +11,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
 	"github.com/efficientgo/tools/core/pkg/logerrcapture"
 	"github.com/efficientgo/tools/core/pkg/merrors"

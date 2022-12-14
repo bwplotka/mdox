@@ -3,7 +3,7 @@ module github.com/bwplotka/mdox
 go 1.19
 
 require (
-	github.com/Kunde21/markdownfmt/v2 v2.1.1-0.20221212171616-95b15aa5ffe4
+	github.com/Kunde21/markdownfmt/v3 v3.0.0
 	github.com/charmbracelet/glamour v0.5.0
 	github.com/efficientgo/tools/core v0.0.0-20210609125236-d73259166f20
 	github.com/efficientgo/tools/extkingpin v0.0.0-20210609125236-d73259166f20
