@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/core/pkg/testutil"
+	"github.com/efficientgo/core/testutil"
 )
 
 func TestFormat_FormatSingle_CodeBlockTransformer(t *testing.T) {

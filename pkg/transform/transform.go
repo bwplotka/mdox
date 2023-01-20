@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/core/pkg/errcapture"
+	"github.com/efficientgo/core/errcapture"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
