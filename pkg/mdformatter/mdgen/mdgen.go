@@ -83,10 +83,13 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		cmd.Stdout = &b
 		if err := cmd.Run(); err != nil {
 			expectedCode, _ := strconv.Atoi(infoStringAttr[infoStringKeyExitCode])
-			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == expectedCode {
-				return b.Bytes(), nil
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				if exitErr.ExitCode() != expectedCode {
+					return nil, errors.Wrapf(err, "run %v, expected exit code %v, got %v, out: %v", execCmd, expectedCode, exitErr.ExitCode(), b.String())
+				}
+			} else {
+				return nil, errors.Wrapf(err, "run %v, out: %v", execCmd, b.String())
 			}
-			return nil, errors.Wrapf(err, "run %v, out: %v", execCmd, b.String())
 		}
 		output := b.Bytes()
 		// Add newline to output if not present.

@@ -34,7 +34,7 @@ test output3
 ```bash mdox-exec="sed -n '1,3p' ./testdata/out3.sh"
 #!/usr/bin/env bash
 
-echo "test output3"
+echo -n "test output3"
 ```
 
 ```yaml mdox-exec="bash ./testdata/out2.sh --name=queryfrontend.InMemoryResponseCacheConfig"
@@ -45,6 +45,6 @@ newline
 ```bash mdox-exec="cat ./testdata/out3.sh"
 #!/usr/bin/env bash
 
-echo "test output3"
+echo -n "test output3"
 exit 2
 ```
