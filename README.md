@@ -70,7 +70,7 @@ Flags:
                                  If specified, all HTTP(s) links that target a
                                  domain and path matching given regexp will be
                                  transformed to relative to anchor dir path (if
-                                 exists).Absolute path links will be converted
+                                 exists). Absolute path links will be converted
                                  to relative links to anchor dir as well.
   -l, --links.validate           If true, all links will be validated
       --links.validate.config-file=<file-path>  
@@ -99,7 +99,7 @@ It's not uncommon that documentation is explaining code or configuration snippet
 For example this Readme contains `mdox --help` which is has to be auto generated on every PR:
 
 ```markdown
-``` bash mdox-exec="mdox fmt --help"
+```bash mdox-exec="mdox fmt --help"
 ...
 ```
 
@@ -113,7 +113,7 @@ This also enables auto updating snippets of code in code blocks using tools like
 Some commands might have non-zero exit codes. mdox will fail commands in such cases(otherwise errors might get formatted into markdown) but the expected exit code can also be passed as a code block directive! For example, below code block executes `go --help` which has 2 as its exit code,
 
 ```markdown
-```go mdox-exec="go --help" mdox-expect-exit-code=2
+```text mdox-exec="go --help" mdox-expect-exit-code=2
 ...
 ```
 
@@ -164,7 +164,7 @@ YAML can be passed in directly as well using `links.validate.config` flag! For m
 
 ### Link localization
 
-It is expected for documentation to contain remote links to the project website. However, in such cases, it creates problems for multi-version docs or multi-domain websites (links would need to be updated for each version which is cumbersome). Also, it would not be navigatable locally or through GitHub(would always redirect to the website) and requires additional link checking.
+It is expected for documentation to contain remote links to the project website. However, in such cases, it creates problems for multi-version docs or multi-domain websites (links would need to be updated for each version which is cumbersome). Also, it would not be navigatable locally or through GitHub (would always redirect to the website) and requires additional link checking.
 
 This is where the `links.localize.address-regex` flag comes in handy!
 
@@ -181,7 +181,7 @@ Just run `mdox transform --config-file=.mdox.yaml` and pass in YAML configuratio
 ```bash mdox-exec="mdox transform --help"
 usage: mdox transform [<flags>]
 
-Transform markdown files in various ways. For example pre process markdown files
+Transform markdown files in various ways. For example pre-process markdown files
 to allow it for use for popular static HTML websites based on markdown source
 code and front matter options.
 
@@ -275,11 +275,11 @@ YAML can be passed in directly as well using `--config` flag! For more details [
 
 Requirements to build this tool:
 
-* Go 1.15+
+* Go 1.19+
 * Linux or MacOS
 
 ```shell
-go get github.com/bwplotka/mdox && go mod tidy
+go install github.com/bwplotka/mdox@latest
 ```
 
 or via [bingo](https://github.com/bwplotka/bingo) if want to pin it:

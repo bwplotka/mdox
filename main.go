@@ -208,7 +208,7 @@ func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
 	`+"```"+`<lang> mdox-exec="<executable + arguments>"
 This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.`).Bool()
 	anchorDir := cmd.Flag("anchor-dir", "Anchor directory for all transformers. PWD is used if flag is not specified.").ExistingDir()
-	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists)."+
+	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists). "+
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
@@ -332,7 +332,7 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 }
 
 func registerTransform(_ context.Context, app *extkingpin.App) {
-	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
+	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre-process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
 	cfg := extflag.RegisterPathOrContent(cmd, "config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config", extflag.WithEnvSubstitution())
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
 		validateConfig, err := cfg.Content()
