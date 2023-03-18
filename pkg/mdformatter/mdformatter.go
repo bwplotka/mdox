@@ -11,7 +11,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
 	"github.com/efficientgo/core/logerrcapture"
 	"github.com/efficientgo/core/merrors"
@@ -83,9 +83,10 @@ type Formatter struct {
 	bm   BackMatterTransformer
 	link LinkTransformer
 	cb   CodeBlockTransformer
+	reg  *prometheus.Registry
 
-	reg       *prometheus.Registry
 	softWraps bool
+	noCodeFmt bool
 }
 
 // Option is a functional option type for Formatter objects.
@@ -130,6 +131,13 @@ func WithMetrics(reg *prometheus.Registry) Option {
 func WithSoftWraps() Option {
 	return func(m *Formatter) {
 		m.softWraps = true
+	}
+}
+
+// WithNoCodeFmt specifies that we shouldn't reformat code snippets.
+func WithNoCodeFmt() Option {
+	return func(m *Formatter) {
+		m.noCodeFmt = true
 	}
 }
 
@@ -394,6 +402,10 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	renderer := markdown.NewRenderer()
 	if f.softWraps {
 		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
+	}
+	// Enable Go code reformatting unless --no-code-fmt is set.
+	if !f.noCodeFmt {
+		renderer.AddMarkdownOptions(markdown.WithCodeFormatters(markdown.GoCodeFormatter))
 	}
 	tr := &transformer{
 		wrapped:   renderer,
