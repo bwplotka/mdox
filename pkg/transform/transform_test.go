@@ -4,11 +4,11 @@
 package transform
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/efficientgo/core/testutil"
-	"github.com/pkg/errors"
 )
 
 func TestNewTargetRelPath(t *testing.T) {

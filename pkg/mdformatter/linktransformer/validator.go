@@ -4,10 +4,9 @@
 package linktransformer
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 type Validator interface {
@@ -67,7 +66,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.l.roundTripVisitedLinks.Inc()
 	r.c.WithTransport(r.transportFn(k.dest))
 	if err := r.c.Visit(k.dest); err != nil {
-		r.remoteLinks[k.dest] = errors.Wrapf(err, "remote link %v", k.dest)
+		r.remoteLinks[k.dest] = fmt.Errorf("remote link %v: %w", k.dest, err)
 		return false, nil
 	}
 	return true, nil

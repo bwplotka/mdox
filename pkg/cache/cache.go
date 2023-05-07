@@ -5,12 +5,13 @@ package cache
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -44,11 +45,11 @@ func (s *SQLite3Storage) Init(validity time.Duration, jitter time.Duration) erro
 
 	database, err := sql.Open(driverName, s.Filename)
 	if err != nil {
-		return errors.Wrap(err, "unable to open cache database file")
+		return fmt.Errorf("unable to open cache database file: %w", err)
 	}
 
 	if err = database.Ping(); err != nil {
-		return errors.Wrap(err, "verify connection to cache database")
+		return fmt.Errorf("verify connection to cache database: %w", err)
 	}
 	s.dbHandle = database
 

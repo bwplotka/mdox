@@ -6,6 +6,7 @@ package transform_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/efficientgo/core/testutil"
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 )
 
 func TestTransform(t *testing.T) {
@@ -67,7 +67,7 @@ func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
 				return err
 			}
 			if !e.IsDir() {
-				return errors.Errorf("%v is not a dir, but expected dir", e)
+				return fmt.Errorf("%v is not a dir, but expected dir", e)
 			}
 			return nil
 		}
@@ -77,7 +77,7 @@ func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
 			return err
 		}
 		if e.IsDir() {
-			return errors.Errorf("%v is a dir, but not expected a dir, but file", e)
+			return fmt.Errorf("%v is a dir, but not expected a dir, but file", e)
 		}
 
 		expectedContent, err := os.ReadFile(path)
@@ -89,7 +89,7 @@ func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
 			return err
 		}
 		if !bytes.Equal(expectedContent, content) {
-			return errors.Errorf("expected (from %v):\n %v\n ..got (in %v):\n %v\n", path, string(expectedContent), expectedPath, string(content))
+			return fmt.Errorf("expected (from %v):\n %v\n ..got (in %v):\n %v\n", path, string(expectedContent), expectedPath, string(content))
 		}
 		return nil
 	}))

@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,7 +18,6 @@ import (
 	"github.com/efficientgo/core/errcapture"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,12 +94,12 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 		}
 
 		if len(matches) == 0 {
-			return errors.Errorf("no matches found for extraInputGlob %v", e)
+			return fmt.Errorf("no matches found for extraInputGlob %v", e)
 		}
 
 		for _, m := range matches {
 			if err := filepath.Walk(m, tr.transformFile); err != nil {
-				return errors.Wrap(err, "walk, extra input")
+				return fmt.Errorf("walk, extra input: %w", err)
 			}
 		}
 	}
@@ -106,7 +107,7 @@ func Dir(ctx context.Context, logger log.Logger, config []byte) error {
 	// Move files, preserving dir structure to output while preprocessing files.
 	// For markdown files, adjust links too.
 	if err := filepath.Walk(c.InputDir, tr.transformFile); err != nil {
-		return errors.Wrap(err, "walk")
+		return fmt.Errorf("walk error: %w", err)
 	}
 
 	// Once we did all the changes, change links.
@@ -133,7 +134,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 	// All relative paths are in relation to either input or output dirs.
 	relPath, err := filepath.Rel(t.c.InputDir, path)
 	if err != nil {
-		return errors.Wrap(err, "rel path to input dir")
+		return fmt.Errorf("rel path to input dir: %w", err)
 	}
 
 	// Copy while preserving structure and tolerating custom mapping.
@@ -177,7 +178,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 
 	if tr.FrontMatter != nil {
 		if !isMDFile(target) {
-			return errors.Errorf("front matter option set on file that after transformation is non-markdown: %v", target)
+			return fmt.Errorf("front matter option set on file that after transformation is non-markdown: %v", target)
 		}
 
 		dir, file := filepath.Split(path)
@@ -194,7 +195,7 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 
 		firstHeader, rest, err := getFirstHeader(path, *tr.PopHeader)
 		if err != nil {
-			return errors.Wrap(err, "read first header")
+			return fmt.Errorf("read first header: %w", err)
 		}
 
 		if rest != nil {
@@ -205,11 +206,11 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 
 		wd, err := os.Getwd()
 		if err != nil {
-			return errors.Wrap(err, "get working dir for Path")
+			return fmt.Errorf("get working dir for Path: %w", err)
 		}
 		originPath, err := filepath.Rel(wd, path)
 		if err != nil {
-			return errors.Wrap(err, "rel path to working dir")
+			return fmt.Errorf("rel path to working dir: %w", err)
 		}
 
 		_, originFilename := filepath.Split(path)
@@ -231,16 +232,16 @@ func (t *transformer) transformFile(path string, info os.FileInfo, err error) er
 
 	if tr.BackMatter != nil {
 		if !isMDFile(target) {
-			return errors.Errorf("back matter option set on file that after transformation is non-markdown: %v", target)
+			return fmt.Errorf("back matter option set on file that after transformation is non-markdown: %v", target)
 		}
 
 		wd, err := os.Getwd()
 		if err != nil {
-			return errors.Wrap(err, "get working dir for Path")
+			return fmt.Errorf("get working dir for Path: %w", err)
 		}
 		originPath, err := filepath.Rel(wd, path)
 		if err != nil {
-			return errors.Wrap(err, "rel path to working dir")
+			return fmt.Errorf("rel path to working dir: %w", err)
 		}
 
 		_, originFilename := filepath.Split(path)
@@ -284,7 +285,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 
 	currRelPath, err := filepath.Rel(r.outputDir, ctx.Filepath)
 	if err != nil {
-		return nil, errors.Wrap(err, "link: rel filepath to output")
+		return nil, fmt.Errorf("link: rel filepath to output: %w", err)
 	}
 
 	if filepath.Join(currRelPath, relDest) == ctx.Filepath {
@@ -302,7 +303,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	if oldRelPath, ok := r.oldRelPath[currRelPath]; ok {
 		oldRelDest, err = filepath.Rel(r.inputDir, filepath.Join(r.inputDir, filepath.Dir(oldRelPath), relDest))
 		if err != nil {
-			return nil, errors.Wrap(err, "link: clean old dest path")
+			return nil, fmt.Errorf("link: clean old dest path: %w", err)
 		}
 	}
 
@@ -337,7 +338,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 
 	newDest, err := filepath.Rel(filepath.Join(r.outputDir, curRelDir), filepath.Join(r.outputDir, currDest))
 	if err != nil {
-		return nil, errors.Wrap(err, "link: rel new dest dir with curr file dir")
+		return nil, fmt.Errorf("link: rel new dest dir with curr file dir: %w", err)
 	}
 
 	if newDest == "." {
@@ -406,7 +407,7 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 
 	m := map[string]interface{}{}
 	if err := yaml.Unmarshal(b.Bytes(), m); err != nil {
-		return nil, errors.Wrapf(err, "generated template for %v is not a valid yaml", ctx.Filepath)
+		return nil, fmt.Errorf("generated template for %v is not a valid yaml: %w", ctx.Filepath, err)
 	}
 
 	if f.localLinksStyle.Hugo != nil && f.target.FileName != f.localLinksStyle.Hugo.IndexFileName {
@@ -455,16 +456,16 @@ func firstMatch(absRelPath string, trs []*TransformationConfig) (*Transformation
 func copyFiles(src, dst string) (err error) {
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
-		return errors.Wrap(err, "cpy source")
+		return fmt.Errorf("cpy source: %w", err)
 	}
 
 	if !sourceFileStat.Mode().IsRegular() {
-		return errors.Errorf("%s is not a regular file", src)
+		return fmt.Errorf("%s is not a regular file", src)
 	}
 
 	source, err := os.Open(src)
 	if err != nil {
-		return errors.Wrap(err, "cpy source")
+		return fmt.Errorf("cpy source: %w", err)
 	}
 	defer errcapture.ExhaustClose(&err, source, "src close")
 
@@ -474,7 +475,7 @@ func copyFiles(src, dst string) (err error) {
 
 	destination, err := os.Create(dst)
 	if err != nil {
-		return errors.Wrap(err, "cpy dest")
+		return fmt.Errorf("cpy dest: %w", err)
 	}
 	defer errcapture.ExhaustClose(&err, destination, "dst close")
 
@@ -500,11 +501,11 @@ func getFirstHeader(path string, popHeader bool) (_ string, rest []byte, err err
 				return strings.TrimPrefix(text, "# "), rest, scanner.Err()
 			}
 			if _, err := file.Seek(int64(len(text)), 0); err != nil {
-				return "", nil, errors.Wrap(err, "seek")
+				return "", nil, fmt.Errorf("seek: %w", err)
 			}
 			rest, err := io.ReadAll(file)
 			if err != nil {
-				return "", nil, errors.Wrap(err, "read")
+				return "", nil, fmt.Errorf("read: %w", err)
 			}
 
 			return strings.TrimPrefix(text, "# "), rest, scanner.Err()

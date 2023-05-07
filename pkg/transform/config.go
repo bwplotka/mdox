@@ -5,13 +5,14 @@ package transform
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/gobwas/glob"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -99,7 +100,7 @@ func (tr TransformationConfig) targetRelPath(relPath string) (_ string, err erro
 		targetSuffix = currFile
 	} else if strings.HasSuffix(tr.Path, "/**") {
 		if !filepath.IsAbs(tr.Path) {
-			return "", errors.Errorf("path has to be absolute if suffix /** is used, got %v", tr.Path)
+			return "", fmt.Errorf("path has to be absolute if suffix /** is used, got %v", tr.Path)
 		}
 
 		targetSuffix = relPath
@@ -128,7 +129,7 @@ func ParseConfig(c []byte) (Config, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
-		return Config{}, errors.Wrapf(err, "parsing template content %q", string(c))
+		return Config{}, fmt.Errorf("parsing template content %q: %w", string(c), err)
 	}
 
 	if cfg.InputDir == "" {
@@ -160,20 +161,20 @@ func ParseConfig(c []byte) (Config, error) {
 	for _, f := range cfg.Transformations {
 		f._glob, err = glob.Compile(f.Glob, '/')
 		if err != nil {
-			return Config{}, errors.Wrapf(err, "compiling glob %v", f.Glob)
+			return Config{}, fmt.Errorf("compiling glob %v: %w", f.Glob, err)
 		}
 
 		if f.FrontMatter != nil {
 			f.FrontMatter._template, err = template.New("").Parse(f.FrontMatter.Template)
 			if err != nil {
-				return Config{}, errors.Wrapf(err, "compiling frontMatter template %v", f.FrontMatter.Template)
+				return Config{}, fmt.Errorf("compiling frontMatter template %v: %w", f.FrontMatter.Template, err)
 			}
 		}
 
 		if f.BackMatter != nil {
 			f.BackMatter._template, err = template.New("").Parse(f.BackMatter.Template)
 			if err != nil {
-				return Config{}, errors.Wrapf(err, "compiling backMatter template %v", f.BackMatter.Template)
+				return Config{}, fmt.Errorf("compiling backMatter template %v: %w", f.BackMatter.Template, err)
 			}
 		}
 	}
