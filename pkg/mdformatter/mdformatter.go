@@ -86,7 +86,7 @@ type Formatter struct {
 	reg  *prometheus.Registry
 
 	softWraps bool
-	noCodeFmt bool
+	codeFmt   bool
 }
 
 // Option is a functional option type for Formatter objects.
@@ -134,10 +134,10 @@ func WithSoftWraps() Option {
 	}
 }
 
-// WithNoCodeFmt specifies that we shouldn't reformat code snippets.
-func WithNoCodeFmt() Option {
+// WithCodeFmt specifies that we shouldn't reformat code snippets.
+func WithCodeFmt() Option {
 	return func(m *Formatter) {
-		m.noCodeFmt = true
+		m.codeFmt = true
 	}
 }
 
@@ -404,7 +404,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
 	}
 	// Enable Go code reformatting unless --no-code-fmt is set.
-	if !f.noCodeFmt {
+	if f.codeFmt {
 		renderer.AddMarkdownOptions(markdown.WithCodeFormatters(markdown.GoCodeFormatter))
 	}
 	tr := &transformer{

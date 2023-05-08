@@ -37,56 +37,58 @@ usage: mdox fmt [<flags>] <files>...
 Formats in-place given markdown files uniformly following GFM (Github Flavored
 Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md
 
+
 Flags:
-  -h, --help                     Show context-sensitive help (also try
-                                 --help-long and --help-man).
-      --version                  Show application version.
-      --log.level=info           Log filtering level.
-      --log.format=clilog        Log format to use.
+  -h, --[no-]help              Show context-sensitive help (also try --help-long
+                               and --help-man).
+      --[no-]version           Show application version.
+      --log.level=info         Log filtering level.
+      --log.format=clilog      Log format to use.
       --profiles.path=PROFILES.PATH  
-                                 Path to directory where CPU and heap profiles
-                                 will be saved; If empty, no profiling will be
-                                 enabled.
+                               Path to directory where CPU and heap profiles
+                               will be saved; If empty, no profiling will be
+                               enabled.
       --metrics.path=METRICS.PATH  
-                                 Path to directory where metrics are saved in
-                                 OpenMetrics format; If empty, no metrics will
-                                 be saved.
-      --check                    If true, fmt will not modify the given files,
-                                 instead it will fail if files needs formatting
-      --soft-wraps               If true, fmt will preserve soft line breaks for
-                                 given files
-      --no-code-fmt              If true, don't reformat code snippets
-      --code.disable-directives  If false, fmt will parse custom fenced
-                                 code directives prefixed with 'mdox-gen' to
-                                 autogenerate code snippets. For example:
-                                 
-                                   ```<lang> mdox-exec="<executable + arguments>"
-                                 
-                                 This directive runs executable with arguments
-                                 and put its stderr and stdout output inside
-                                 code block content, replacing existing one.
-      --anchor-dir=ANCHOR-DIR    Anchor directory for all transformers. PWD is
-                                 used if flag is not specified.
+                               Path to directory where metrics are saved in
+                               OpenMetrics format; If empty, no metrics will be
+                               saved.
+      --[no-]check             If true, fmt will not modify the given files,
+                               instead it will fail if files needs formatting
+      --[no-]soft-wraps        If true, fmt will preserve soft line breaks for
+                               given files
+      --[no-]code-fmt          Reformat code snippets
+      --[no-]code.disable-directives  
+                               If false, fmt will parse custom fenced
+                               code directives prefixed with 'mdox-gen' to
+                               autogenerate code snippets. For example:
+                               
+                                 ```<lang> mdox-exec="<executable + arguments>"
+                               
+                               This directive runs executable with arguments
+                               and put its stderr and stdout output inside code
+                               block content, replacing existing one.
+      --anchor-dir=ANCHOR-DIR  Anchor directory for all transformers. PWD is
+                               used if flag is not specified.
       --links.localize.address-regex=LINKS.LOCALIZE.ADDRESS-REGEX  
-                                 If specified, all HTTP(s) links that target a
-                                 domain and path matching given regexp will be
-                                 transformed to relative to anchor dir path (if
-                                 exists). Absolute path links will be converted
-                                 to relative links to anchor dir as well.
-  -l, --links.validate           If true, all links will be validated
+                               If specified, all HTTP(s) links that target a
+                               domain and path matching given regexp will be
+                               transformed to relative to anchor dir path (if
+                               exists). Absolute path links will be converted to
+                               relative links to anchor dir as well.
+  -l, --[no-]links.validate    If true, all links will be validated
       --links.validate.config-file=<file-path>  
-                                 Path to YAML file for skipping
-                                 link check, with spec defined in
-                                 github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
+                               Path to YAML file for skipping
+                               link check, with spec defined in
+                               github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
       --links.validate.config=<content>  
-                                 Alternative to 'links.validate.config-file'
-                                 flag (mutually exclusive). Content of YAML file
-                                 for skipping link check, with spec defined in
-                                 github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
-      --cache.clear              If true, entire cache database will be dropped
-                                 and rebuilt when mdox is run. Useful in case
-                                 cache needs to be cleared immediately from
-                                 GitHub Actions or other CI runner cache.
+                               Alternative to 'links.validate.config-file'
+                               flag (mutually exclusive). Content of YAML file
+                               for skipping link check, with spec defined in
+                               github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig
+      --[no-]cache.clear       If true, entire cache database will be dropped
+                               and rebuilt when mdox is run. Useful in case
+                               cache needs to be cleared immediately from GitHub
+                               Actions or other CI runner cache.
 
 Args:
   <files>  Markdown file(s) to process.
@@ -186,10 +188,11 @@ Transform markdown files in various ways. For example pre-process markdown files
 to allow it for use for popular static HTML websites based on markdown source
 code and front matter options.
 
+
 Flags:
-  -h, --help                     Show context-sensitive help (also try
+  -h, --[no-]help                Show context-sensitive help (also try
                                  --help-long and --help-man).
-      --version                  Show application version.
+      --[no-]version             Show application version.
       --log.level=info           Log filtering level.
       --log.format=clilog        Log format to use.
       --profiles.path=PROFILES.PATH  

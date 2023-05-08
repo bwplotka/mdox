@@ -4,9 +4,10 @@ go 1.19
 
 require (
 	github.com/Kunde21/markdownfmt/v3 v3.0.0
+	github.com/alecthomas/kingpin/v2 v2.3.2
 	github.com/charmbracelet/glamour v0.5.0
 	github.com/efficientgo/core v1.0.0-rc.2
-	github.com/efficientgo/tools/extkingpin v0.0.0-20221005154214-b82254effbb1
+	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
 	github.com/fatih/structtag v1.2.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/go-kit/log v0.2.1
@@ -23,14 +24,12 @@ require (
 	github.com/theckman/yacspin v0.8.0
 	github.com/yuin/goldmark v1.4.12
 	golang.org/x/net v0.9.0
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/alecthomas/chroma v0.10.0 // indirect
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/antchfx/htmlquery v1.2.3 // indirect
@@ -74,6 +73,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/tdewolff/parse/v2 v2.6.0 // indirect
 	github.com/temoto/robotstxt v1.1.1 // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect

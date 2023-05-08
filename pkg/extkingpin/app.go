@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 type FlagClause interface {

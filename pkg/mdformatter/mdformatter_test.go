@@ -149,12 +149,12 @@ func TestCheck_SoftWraps(t *testing.T) {
 }
 
 func TestFormatBadlyFormattedGoCode(t *testing.T) {
-	t.Run("Format WithNoCodeFmt", func(t *testing.T) {
+	t.Run("Format without WithCodeFmt", func(t *testing.T) {
 		file, err := os.OpenFile("testdata/badly_formatted_go_code.md", os.O_RDONLY, 0)
 		testutil.Ok(t, err)
 		defer file.Close()
 
-		f := New(context.Background(), WithNoCodeFmt())
+		f := New(context.Background())
 
 		exp, err := os.ReadFile("testdata/badly_formatted_go_code.md")
 		testutil.Ok(t, err)
@@ -169,7 +169,7 @@ func TestFormatBadlyFormattedGoCode(t *testing.T) {
 		testutil.Ok(t, err)
 		defer file.Close()
 
-		f := New(context.Background())
+		f := New(context.Background(), WithCodeFmt())
 
 		exp, err := os.ReadFile("testdata/badly_formatted_go_code.reformatted.md")
 		testutil.Ok(t, err)
