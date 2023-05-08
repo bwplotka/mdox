@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/efficientgo/core/testutil"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 )
 
 func TestFormat_FormatSingle_NoTransformers(t *testing.T) {

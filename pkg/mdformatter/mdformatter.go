@@ -16,7 +16,7 @@ import (
 	"github.com/bwplotka/mdox/pkg/gitdiff"
 	"github.com/efficientgo/core/logerrcapture"
 	"github.com/efficientgo/core/merrors"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/mattn/go-isatty"
 	"github.com/prometheus/client_golang/prometheus"
