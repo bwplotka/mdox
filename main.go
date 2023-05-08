@@ -202,7 +202,7 @@ func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
 	softWraps := cmd.Flag("soft-wraps", "If true, fmt will preserve soft line breaks for given files").Bool()
-	noCodeFmt := cmd.Flag("no-code-fmt", "If true, don't reformat code snippets").Bool()
+	codeFmt := cmd.Flag("code-fmt", "Reformat code snippets").Default("true").Bool()
 
 	disableGenCodeBlocksDirectives := cmd.Flag("code.disable-directives", `If false, fmt will parse custom fenced code directives prefixed with 'mdox-gen' to autogenerate code snippets. For example:
 	`+"```"+`<lang> mdox-exec="<executable + arguments>"
@@ -228,8 +228,8 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		if *softWraps {
 			opts = append(opts, mdformatter.WithSoftWraps())
 		}
-		if *noCodeFmt {
-			opts = append(opts, mdformatter.WithNoCodeFmt())
+		if *codeFmt {
+			opts = append(opts, mdformatter.WithCodeFmt())
 		}
 		if len(*files) == 0 {
 			return errors.New("no files to format")
