@@ -17,7 +17,6 @@ require (
 	github.com/mattn/go-shellwords v1.0.10
 	github.com/mattn/go-sqlite3 v1.14.7
 	github.com/oklog/run v1.1.0
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/common v0.32.1
 	github.com/sergi/go-diff v1.0.0
@@ -65,6 +64,7 @@ require (
 	github.com/niklasfasching/go-org v1.6.5 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -31,7 +32,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -91,7 +91,7 @@ func main() {
 	if *profilesPath != "" {
 		finalize, err := snapshotProfiles(*profilesPath)
 		if err != nil {
-			level.Error(logger).Log("err", errors.Wrapf(err, "%s profiles init failed", cmd))
+			level.Error(logger).Log("err", fmt.Errorf("%s profiles init failed: %w", cmd, err))
 			os.Exit(1)
 		}
 		defer logerrcapture.Do(logger, finalize, "profiles")
@@ -117,11 +117,11 @@ func main() {
 
 	if err := g.Run(); err != nil {
 		if *logLevel == "debug" {
-			// Use %+v for github.com/pkg/errors error to print with stack.
-			level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
+			// Use %+v to print with stack.
+			level.Error(logger).Log("msg", "command failed", "command", cmd, "err", fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
-		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
+		level.Error(logger).Log("msg", "command failed", "command", cmd, "err", err)
 		os.Exit(1)
 	}
 }
@@ -296,7 +296,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if err != nil {
 				return err
 			}
-			return errors.Errorf("files not formatted: %v", diffOut)
+			return fmt.Errorf("files not formatted: %v", diffOut)
 
 		}
 		if err := mdformatter.Format(ctx, logger, *files, opts...); err != nil {
@@ -328,7 +328,7 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 	// Check if provided files are within anchorDir way.
 	for _, f := range files {
 		if !strings.HasPrefix(f, anchorDir) {
-			return "", errors.Errorf("anchorDir %q is not in path of provided file %q", anchorDir, f)
+			return "", fmt.Errorf("anchorDir %q is not in path of provided file %q", anchorDir, f)
 		}
 	}
 	return anchorDir, nil
