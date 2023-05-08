@@ -9,7 +9,7 @@ require (
 	github.com/efficientgo/tools/extkingpin v0.0.0-20221005154214-b82254effbb1
 	github.com/fatih/structtag v1.2.0
 	github.com/felixge/fgprof v0.9.1
-	github.com/go-kit/kit v0.10.0
+	github.com/go-kit/log v0.2.1
 	github.com/gobwas/glob v0.2.3
 	github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0
 	github.com/gohugoio/hugo v0.101.0
@@ -46,7 +46,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/fatih/color v1.7.0 // indirect
-	github.com/go-logfmt/logfmt v0.5.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

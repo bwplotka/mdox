@@ -1,7 +1,7 @@
 // Copyright (c) Bartłomiej Płotka @bwplotka
 // Licensed under the Apache License 2.0.
 
-// Package clilog is a github.com/go-kit/kit/log logger implementation suitable for CLI tools.
+// Package clilog is a github.com/go-kit/log logger implementation suitable for CLI tools.
 // Main goal is to log in human readable ways e.g:
 //
 // * No special sign escaping.
@@ -9,7 +9,7 @@
 // * Values separated with ': '
 // * Support for pretty printing multi errors (including nested ones) in format of (<something>: <err1>; <err2>; ...; <errN>)
 // * TODO(bwplotka): Support for multiple multilines.
-// This implementation allows CLI to use github.com/go-kit/kit/log enabled libraries in CLI friendly way.
+// This implementation allows CLI to use github.com/go-kit/log enabled libraries in CLI friendly way.
 package clilog
 
 import (
@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/efficientgo/core/merrors"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 )
 
 type buf struct {

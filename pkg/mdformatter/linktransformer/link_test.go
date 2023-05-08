@@ -16,7 +16,7 @@ import (
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/core/testutil"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	_ "github.com/mattn/go-sqlite3"
 )
 

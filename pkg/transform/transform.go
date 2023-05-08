@@ -16,8 +16,8 @@ import (
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
 	"github.com/efficientgo/core/errcapture"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"gopkg.in/yaml.v3"
 )
 

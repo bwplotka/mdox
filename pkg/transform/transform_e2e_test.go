@@ -13,7 +13,7 @@ import (
 
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/efficientgo/core/testutil"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 )
 
 func TestTransform(t *testing.T) {
