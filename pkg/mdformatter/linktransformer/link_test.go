@@ -304,7 +304,9 @@ func TestValidator_TransformDestination(t *testing.T) {
 			MustNewValidator(logger, []byte(""), anchorDir, nil),
 		))
 		testutil.NotOk(t, err)
-		testutil.Assert(t, strings.Contains(err.Error(), "status code 404: Not Found"))
+		testutil.Assert(t, strings.Contains(err.Error(), fmt.Sprintf("%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible even after retry; status code 0",relDirPath+filePath)))
+		testutil.Assert(t, strings.Contains(err.Error(), fmt.Sprintf("%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", relDirPath+filePath)))
+		
 	})
 
 	t.Run("check valid & 404 link with validate config", func(t *testing.T) {
