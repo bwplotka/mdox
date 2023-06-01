@@ -16,7 +16,7 @@ require (
 	github.com/gohugoio/hugo v0.101.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-shellwords v1.0.12
-	github.com/mattn/go-sqlite3 v1.14.16
+	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/oklog/run v1.1.0
 	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/common v0.42.0
