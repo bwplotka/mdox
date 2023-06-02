@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/Kunde21/markdownfmt/v3 v3.1.0
 	github.com/alecthomas/kingpin/v2 v2.3.2
-	github.com/charmbracelet/glamour v0.5.0
+	github.com/charmbracelet/glamour v0.6.0
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
 	github.com/fatih/structtag v1.2.0
@@ -14,7 +14,7 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0
 	github.com/gohugoio/hugo v0.101.0
-	github.com/mattn/go-isatty v0.0.14
+	github.com/mattn/go-isatty v0.0.16
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/oklog/run v1.1.0
@@ -22,7 +22,7 @@ require (
 	github.com/prometheus/common v0.42.0
 	github.com/sergi/go-diff v1.0.0
 	github.com/theckman/yacspin v0.8.0
-	github.com/yuin/goldmark v1.4.12
+	github.com/yuin/goldmark v1.5.2
 	golang.org/x/net v0.10.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -35,6 +35,7 @@ require (
 	github.com/antchfx/htmlquery v1.2.3 // indirect
 	github.com/antchfx/xmlquery v1.3.4 // indirect
 	github.com/antchfx/xpath v1.1.10 // indirect
+	github.com/aymanbagabas/go-osc52 v1.0.3 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/godartsass v0.14.0 // indirect
@@ -54,12 +55,12 @@ require (
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.17 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
-	github.com/muesli/termenv v0.9.0 // indirect
+	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/niklasfasching/go-org v1.6.5 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
