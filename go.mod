@@ -6,7 +6,7 @@ require (
 	github.com/Kunde21/markdownfmt/v3 v3.1.0
 	github.com/alecthomas/kingpin/v2 v2.3.2
 	github.com/charmbracelet/glamour v0.6.0
-	github.com/dave/jennifer v1.4.1
+	github.com/dave/jennifer v1.6.1
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
 	github.com/fatih/structtag v1.2.0

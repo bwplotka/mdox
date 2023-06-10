@@ -6,16 +6,15 @@ package yamlgen
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"go/types"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/dave/jennifer/jen"
 	"github.com/pkg/errors"
@@ -31,16 +30,13 @@ func GenGoCode(src []byte) (string, error) {
 	// Create new main file.
 	fset := token.NewFileSet()
 	generatedCode := jen.NewFile("main")
+	// Don't really need to format here, saves time.
+	// generatedCode.NoFormat = true
 
 	// Parse source file.
 	f, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
 		return "", err
-	}
-
-	// Add imports if needed(will not be used if not required in code).
-	for _, s := range f.Imports {
-		generatedCode.ImportName(s.Path.Value[1:len(s.Path.Value)-1], "")
 	}
 
 	// Init statements for structs.
@@ -54,17 +50,18 @@ func GenGoCode(src []byte) (string, error) {
 		if genericDecl, ok := decl.(*ast.GenDecl); ok {
 			// Check if declaration spec is `type`.
 			if typeDecl, ok := genericDecl.Specs[0].(*ast.TypeSpec); ok {
-				var structFields []jen.Code
 				// Cast to `type struct`.
 				structDecl, ok := typeDecl.Type.(*ast.StructType)
 				if !ok {
 					generatedCode.Type().Id(typeDecl.Name.Name).Id(string(src[typeDecl.Type.Pos()-1 : typeDecl.Type.End()-1]))
 					continue
 				}
-				fields := structDecl.Fields.List
+
+				var structFields []jen.Code
 				arrayInit := make(jen.Dict)
 
 				// Loop and generate fields for each field.
+				fields := structDecl.Fields.List
 				for _, field := range fields {
 					// Each field might have multiple names.
 					names := field.Names
@@ -72,15 +69,51 @@ func GenGoCode(src []byte) (string, error) {
 						if n.IsExported() {
 							pos := n.Obj.Decl.(*ast.Field)
 
-							// Check if field is a slice type.
-							sliceRe := regexp.MustCompile(`.*\[.*\].*`)
-							if sliceRe.MatchString(types.ExprString(field.Type)) {
-								arrayInit[jen.Id(n.Name)] = jen.Id(string(src[pos.Type.Pos()-1 : pos.Type.End()-1])).Values(jen.Id(string(src[pos.Type.Pos()+1 : pos.Type.End()-1])).Values())
+							// Copy struct field to generated code, with imports in case of other package imported field.
+							if pos.Tag != nil {
+								typeStr := string(src[pos.Type.Pos()-1 : pos.Type.End()-1])
+								// Check if field is imported from other package.
+								if strings.Contains(typeStr, ".") {
+									typeArr := strings.SplitN(typeStr, ".", 2)
+									// Match the import name with the import statement.
+									for _, s := range f.Imports {
+										moduleName := ""
+										// Choose to copy same alias as in source file or use package name.
+										if s.Name == nil {
+											_, moduleName = filepath.Split(s.Path.Value[1 : len(s.Path.Value)-1])
+											generatedCode.ImportName(s.Path.Value[1:len(s.Path.Value)-1], moduleName)
+										} else {
+											moduleName = s.Name.String()
+											generatedCode.ImportAlias(s.Path.Value[1:len(s.Path.Value)-1], moduleName)
+										}
+										// Add field to struct only if import name matches.
+										if moduleName == typeArr[0] {
+											structFields = append(structFields, jen.Id(n.Name).Qual(s.Path.Value[1:len(s.Path.Value)-1], typeArr[1]).Id(pos.Tag.Value))
+										}
+									}
+								} else {
+									structFields = append(structFields, jen.Id(n.Name).Id(string(src[pos.Type.Pos()-1:pos.Type.End()-1])).Id(pos.Tag.Value))
+								}
 							}
 
-							// Copy struct field to generated code.
-							if pos.Tag != nil {
-								structFields = append(structFields, jen.Id(n.Name).Id(string(src[pos.Type.Pos()-1:pos.Type.End()-1])).Id(pos.Tag.Value))
+							// Check if field is a slice type.
+							sliceRe := regexp.MustCompile(`^\[.*\].*$`)
+							typeStr := types.ExprString(field.Type)
+							if sliceRe.MatchString(typeStr) {
+								iArr := "[]int"
+								fArr := "[]float"
+								cArr := "[]complex"
+								uArr := "[]uint"
+								switch typeStr {
+								case "[]bool", "[]string", "[]byte", "[]rune",
+									iArr, iArr + "8", iArr + "16", iArr + "32", iArr + "64",
+									fArr + "32", fArr + "64",
+									cArr + "64", cArr + "128",
+									uArr, uArr + "8", uArr + "16", uArr + "32", uArr + "64", uArr + "ptr":
+									arrayInit[jen.Id(n.Name)] = jen.Id(typeStr + "{}")
+								default:
+									arrayInit[jen.Id(n.Name)] = jen.Id(string(src[pos.Type.Pos()-1 : pos.Type.End()-1])).Values(jen.Id(string(src[pos.Type.Pos()+1 : pos.Type.End()-1])).Values())
+								}
 							}
 						}
 					}
@@ -109,12 +142,12 @@ func GenGoCode(src []byte) (string, error) {
 
 	// Generate main function in new module.
 	generatedCode.Func().Id("main").Params().Block(init...)
-	return fmt.Sprintf("%#v", generatedCode), nil
+	return generatedCode.GoString(), nil
 }
 
 // execGoCode executes and returns output from generated Go code.
 func ExecGoCode(ctx context.Context, mainGo string) ([]byte, error) {
-	tmpDir, err := ioutil.TempDir("", "structgen")
+	tmpDir, err := os.MkdirTemp("", "structgen")
 	if err != nil {
 		return nil, err
 	}
