@@ -17,7 +17,7 @@ import (
 )
 
 type Config struct {
-	Version int
+	Version int `yaml:"version"`
 
 	Cache CacheConfig `yaml:"cache"`
 

@@ -6,6 +6,7 @@ require (
 	github.com/Kunde21/markdownfmt/v3 v3.1.0
 	github.com/alecthomas/kingpin/v2 v2.3.2
 	github.com/charmbracelet/glamour v0.6.0
+	github.com/dave/jennifer v1.6.1
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
 	github.com/fatih/structtag v1.2.0
@@ -18,6 +19,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/oklog/run v1.1.0
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/common v0.42.0
 	github.com/sergi/go-diff v1.0.0
@@ -64,7 +66,6 @@ require (
 	github.com/niklasfasching/go-org v1.6.5 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
