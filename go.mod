@@ -19,7 +19,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/oklog/run v1.1.0
 	github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/common v0.42.0
+	github.com/prometheus/common v0.44.0
 	github.com/sergi/go-diff v1.0.0
 	github.com/theckman/yacspin v0.8.0
 	github.com/yuin/goldmark v1.5.2
@@ -65,7 +65,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
