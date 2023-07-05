@@ -20,7 +20,7 @@ require (
 	github.com/oklog/run v1.1.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/common v0.44.0
-	github.com/sergi/go-diff v1.0.0
+	github.com/sergi/go-diff v1.3.1
 	github.com/theckman/yacspin v0.8.0
 	github.com/yuin/goldmark v1.5.4
 	golang.org/x/net v0.11.0
