@@ -22,8 +22,8 @@ const (
 
 // Config holds the cache configuration.
 type Config struct {
-	// Type is the type of the cache.
-	Type cacheType
+	// type is the type of the cache.
+	cacheType cacheType
 	// Validity is the duration for which the cache is valid.
 	Validity time.Duration
 	// Jitter is the jitter to apply when considering a cached entry valid or not.
@@ -40,8 +40,8 @@ func NewConfig() Config {
 }
 
 // Present tell whether a cache configuration is present.
-func (c *Config) Present() bool {
-	return c.Type != cacheTypeNone
+func (c *Config) IsSet() bool {
+	return c.cacheType != cacheTypeNone && c.cacheType != cacheTypeEmpty
 }
 
 // UnmarshalYAML puts the unmarshalled yaml data into the internal cache parser
@@ -80,7 +80,7 @@ func (c *Config) load() error {
 	default:
 		return errors.New("unsupported cache type")
 	}
-	c.Type = c.cacheParser.Type
+	c.cacheType = c.cacheParser.Type
 	return nil
 }
 
