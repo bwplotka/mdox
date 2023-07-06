@@ -39,7 +39,7 @@ func NewConfig() Config {
 	}
 }
 
-// Present tell whether a cache configuration is present.
+// IsSet tell whether a cache configuration is present.
 func (c *Config) IsSet() bool {
 	return c.cacheType != cacheTypeNone && c.cacheType != cacheTypeEmpty
 }
