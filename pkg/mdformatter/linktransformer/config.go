@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/bwplotka/mdox/pkg/cache"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -104,28 +103,6 @@ func ParseConfig(c []byte) (Config, error) {
 
 	if cfg.Parallelism < 0 {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
-	}
-
-	switch cfg.Cache.Type {
-	case sqlite:
-		if cfg.Cache.Validity != "" {
-			var err error
-			cfg.Cache.validity, err = time.ParseDuration(cfg.Cache.Validity)
-			if err != nil {
-				return Config{}, fmt.Errorf("parsing cache validity duration: %w", err)
-			}
-		}
-
-		if cfg.Cache.Jitter != "" {
-			var err error
-			cfg.Cache.jitter, err = time.ParseDuration(cfg.Cache.Jitter)
-			if err != nil {
-				return Config{}, fmt.Errorf("parsing cache jitter duration: %w", err)
-			}
-		}
-	case none, "":
-	default:
-		return Config{}, errors.New("unsupported cache type")
 	}
 
 	if len(cfg.Validators) <= 0 {
