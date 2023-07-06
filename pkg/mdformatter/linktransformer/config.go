@@ -6,15 +6,18 @@ package linktransformer
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"regexp"
-	"strconv"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/pkg/errors"
+=======
+>>>>>>> b900e5ffcabb79b9c5ff764fd6bbb5b931315a0a
 	"gopkg.in/yaml.v3"
 )
 
@@ -83,14 +86,14 @@ func ParseConfig(c []byte) (Config, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
-		return Config{}, errors.Wrapf(err, "parsing YAML content %q", string(c))
+		return Config{}, fmt.Errorf("parsing YAML content %q: %w", string(c), err)
 	}
 
 	if cfg.Timeout != "" {
 		var err error
 		cfg.timeout, err = time.ParseDuration(cfg.Timeout)
 		if err != nil {
-			return Config{}, errors.Wrap(err, "parsing timeout duration")
+			return Config{}, fmt.Errorf("parsing timeout duration: %w", err)
 		}
 	}
 
@@ -98,12 +101,34 @@ func ParseConfig(c []byte) (Config, error) {
 		var err error
 		cfg.randomDelay, err = time.ParseDuration(cfg.RandomDelay)
 		if err != nil {
-			return Config{}, errors.Wrap(err, "parsing random delay duration")
+			return Config{}, fmt.Errorf("parsing random delay duration: %w", err)
 		}
 	}
 
 	if cfg.Parallelism < 0 {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
+	}
+
+	switch cfg.Cache.Type {
+	case sqlite:
+		if cfg.Cache.Validity != "" {
+			var err error
+			cfg.Cache.validity, err = time.ParseDuration(cfg.Cache.Validity)
+			if err != nil {
+				return Config{}, fmt.Errorf("parsing cache validity duration: %w", err)
+			}
+		}
+
+		if cfg.Cache.Jitter != "" {
+			var err error
+			cfg.Cache.jitter, err = time.ParseDuration(cfg.Cache.Jitter)
+			if err != nil {
+				return Config{}, fmt.Errorf("parsing cache jitter duration: %w", err)
+			}
+		}
+	case none, "":
+	default:
+		return Config{}, errors.New("unsupported cache type")
 	}
 
 	if len(cfg.Validators) <= 0 {
@@ -119,7 +144,7 @@ func ParseConfig(c []byte) (Config, error) {
 			// Get maxNum from provided regex or fail.
 			regex, maxNum, err := getGitHubRegex(cfg.Validators[i].Regex, cfg.Validators[i].Token)
 			if err != nil {
-				return Config{}, errors.Wrapf(err, "parsing githubPullsIssues Regex")
+				return Config{}, fmt.Errorf("parsing githubPullsIssues Regex: %w", err)
 			}
 			cfg.Validators[i].ghValidator._regex = regex
 			cfg.Validators[i].ghValidator._maxNum = maxNum
@@ -172,7 +197,7 @@ func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int
 		return nil, math.MaxInt64, err
 	}
 	if respPull.StatusCode != 200 {
-		return nil, math.MaxInt64, errors.New("pulls API request failed. status code: " + strconv.Itoa(respPull.StatusCode))
+		return nil, math.MaxInt64, fmt.Errorf("pulls API request failed. status code: %d", respPull.StatusCode)
 	}
 	defer respPull.Body.Close()
 	if err := json.NewDecoder(respPull.Body).Decode(&pullNum); err != nil {
@@ -184,7 +209,7 @@ func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int
 		return nil, math.MaxInt64, err
 	}
 	if respIssue.StatusCode != 200 {
-		return nil, math.MaxInt64, errors.New("issues API request failed. status code: " + strconv.Itoa(respIssue.StatusCode))
+		return nil, math.MaxInt64, fmt.Errorf("issues API request failed. status code: %d", respIssue.StatusCode)
 	}
 	defer respIssue.Body.Close()
 	if err := json.NewDecoder(respIssue.Body).Decode(&issueNum); err != nil {

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/clilog"
 	"github.com/bwplotka/mdox/pkg/extkingpin"
@@ -24,17 +26,15 @@ import (
 	"github.com/bwplotka/mdox/pkg/transform"
 	"github.com/bwplotka/mdox/pkg/version"
 	"github.com/charmbracelet/glamour"
-	"github.com/efficientgo/tools/core/pkg/errcapture"
-	"github.com/efficientgo/tools/core/pkg/logerrcapture"
+	"github.com/efficientgo/core/errcapture"
+	"github.com/efficientgo/core/logerrcapture"
 	extflag "github.com/efficientgo/tools/extkingpin"
 	"github.com/felixge/fgprof"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/oklog/run"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const (
@@ -91,7 +91,7 @@ func main() {
 	if *profilesPath != "" {
 		finalize, err := snapshotProfiles(*profilesPath)
 		if err != nil {
-			level.Error(logger).Log("err", errors.Wrapf(err, "%s profiles init failed", cmd))
+			level.Error(logger).Log("err", fmt.Errorf("%s profiles init failed: %w", cmd, err))
 			os.Exit(1)
 		}
 		defer logerrcapture.Do(logger, finalize, "profiles")
@@ -117,14 +117,13 @@ func main() {
 
 	if err := g.Run(); err != nil {
 		if *logLevel == "debug" {
-			// Use %+v for github.com/pkg/errors error to print with stack.
-			level.Error(logger).Log("err", fmt.Sprintf("%+v", errors.Wrapf(err, "%s command failed", cmd)))
+			// Use %+v to print with stack.
+			level.Error(logger).Log("msg", "command failed", "command", cmd, "err", fmt.Sprintf("%+v", err))
 			os.Exit(1)
 		}
-		level.Error(logger).Log("err", errors.Wrapf(err, "%s command failed", cmd))
+		level.Error(logger).Log("msg", "command failed", "command", cmd, "err", err)
 		os.Exit(1)
 	}
-
 }
 
 func snapshotProfiles(dir string) (func() error, error) {
@@ -203,12 +202,13 @@ func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
 	softWraps := cmd.Flag("soft-wraps", "If true, fmt will preserve soft line breaks for given files").Bool()
+	codeFmt := cmd.Flag("code-fmt", "Reformat code snippets").Default("true").Bool()
 
 	disableGenCodeBlocksDirectives := cmd.Flag("code.disable-directives", `If false, fmt will parse custom fenced code directives prefixed with 'mdox-gen' to autogenerate code snippets. For example:
 	`+"```"+`<lang> mdox-exec="<executable + arguments>"
 This directive runs executable with arguments and put its stderr and stdout output inside code block content, replacing existing one.`).Bool()
 	anchorDir := cmd.Flag("anchor-dir", "Anchor directory for all transformers. PWD is used if flag is not specified.").ExistingDir()
-	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists)."+
+	linksLocalizeForAddress := cmd.Flag("links.localize.address-regex", "If specified, all HTTP(s) links that target a domain and path matching given regexp will be transformed to relative to anchor dir path (if exists). "+
 		"Absolute path links will be converted to relative links to anchor dir as well.").Regexp()
 	linksValidateEnabled := cmd.Flag("links.validate", "If true, all links will be validated").Short('l').Bool()
 	linksValidateConfig := extflag.RegisterPathOrContent(cmd, "links.validate.config", "YAML file for skipping link check, with spec defined in github.com/bwplotka/mdox/pkg/linktransformer.ValidatorConfig", extflag.WithEnvSubstitution())
@@ -227,6 +227,9 @@ This directive runs executable with arguments and put its stderr and stdout outp
 		}
 		if *softWraps {
 			opts = append(opts, mdformatter.WithSoftWraps())
+		}
+		if *codeFmt {
+			opts = append(opts, mdformatter.WithCodeFmt())
 		}
 		if len(*files) == 0 {
 			return errors.New("no files to format")
@@ -293,7 +296,7 @@ This directive runs executable with arguments and put its stderr and stdout outp
 			if err != nil {
 				return err
 			}
-			return errors.Errorf("files not formatted: %v", diffOut)
+			return fmt.Errorf("files not formatted: %v", diffOut)
 
 		}
 		if err := mdformatter.Format(ctx, logger, *files, opts...); err != nil {
@@ -325,14 +328,14 @@ func validateAnchorDir(anchorDir string, files []string) (_ string, err error) {
 	// Check if provided files are within anchorDir way.
 	for _, f := range files {
 		if !strings.HasPrefix(f, anchorDir) {
-			return "", errors.Errorf("anchorDir %q is not in path of provided file %q", anchorDir, f)
+			return "", fmt.Errorf("anchorDir %q is not in path of provided file %q", anchorDir, f)
 		}
 	}
 	return anchorDir, nil
 }
 
 func registerTransform(_ context.Context, app *extkingpin.App) {
-	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
+	cmd := app.Command("transform", "Transform markdown files in various ways. For example pre-process markdown files to allow it for use for popular static HTML websites based on markdown source code and front matter options.")
 	cfg := extflag.RegisterPathOrContent(cmd, "config", "Path to the YAML file with spec defined in github.com/bwplotka/mdox/pkg/transform.Config", extflag.WithEnvSubstitution())
 	cmd.Run(func(ctx context.Context, logger log.Logger) error {
 		validateConfig, err := cfg.Content()

@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -22,11 +24,10 @@ import (
 
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/core/pkg/merrors"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/efficientgo/core/merrors"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/gocolly/colly/v2"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -293,7 +294,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		defer v.rMu.Unlock()
 		if v.storage != nil {
 			if err := v.storage.CacheURL(response.Ctx.Get(originalURLKey)); err != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link not saved to cache %v", response.Ctx.Get(originalURLKey))
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link not saved to cache %v: %w", response.Ctx.Get(originalURLKey), err)
 			}
 		}
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = nil
@@ -323,10 +324,10 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			}
 
 			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
 				break
 			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q rate limited even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q rate limited even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
 		// 0 StatusCode means error on call side.
 		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable, 0:
 			if retries > 0 {
@@ -335,12 +336,12 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
 
 			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "remote link retry %v", response.Ctx.Get(originalURLKey))
+				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
 				break
 			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible even after retry; status code %v", response.Request.URL.String(), response.StatusCode)
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
 		default:
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = errors.Wrapf(err, "%q not accessible; status code %v", response.Request.URL.String(), response.StatusCode)
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
 		}
 	})
 	return v, nil
@@ -377,21 +378,21 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	merr := merrors.New()
 	base, err := os.Getwd()
 	if err != nil {
-		return errors.Wrap(err, "resolve working dir")
+		return fmt.Errorf("resolve working dir: %w", err)
 	}
 	path, err := filepath.Rel(base, ctx.Filepath)
 	if err != nil {
-		return errors.Wrap(err, "find relative path")
+		return fmt.Errorf("find relative path: %w", err)
 	}
 
 	for _, k := range keys {
 		f := v.destFutures[k]
 		if err := f.resultFn(); err != nil {
 			if f.cases == 1 {
-				merr.Add(errors.Wrapf(err, "%v:%v", path, k.lineNumbers))
+				merr.Add(fmt.Errorf("%v:%v: %w", path, k.lineNumbers, err))
 				continue
 			}
-			merr.Add(errors.Wrapf(err, "%v:%v (%v occurrences)", path, k.lineNumbers, f.cases))
+			merr.Add(fmt.Errorf("%v:%v (%v occurrences): %w", path, k.lineNumbers, f.cases, err))
 		}
 	}
 	return merr.Err()
@@ -404,7 +405,7 @@ func (v *validator) checkLocal(k futureKey) bool {
 		if isValidEmail(email) {
 			return true
 		}
-		v.destFutures[k].resultFn = func() error { return errors.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
+		v.destFutures[k].resultFn = func() error { return fmt.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
 		return false
 	}
 
@@ -413,7 +414,7 @@ func (v *validator) checkLocal(k futureKey) bool {
 
 	// Local link. Check if exists.
 	if err := v.localLinks.Lookup(newDest); err != nil {
-		v.destFutures[k].resultFn = func() error { return errors.Wrapf(err, "link %v, normalized to", k.dest) }
+		v.destFutures[k].resultFn = func() error { return fmt.Errorf("link %v, normalized to: %w", k.dest, err) }
 		return false
 	}
 	return true
@@ -484,7 +485,7 @@ func (l localLinksCache) Lookup(absLink string) error {
 		ids = l[absLinkSplit[0]]
 	}
 	if ids == nil {
-		return errors.Wrapf(FileNotFoundErr, "%v", absLinkSplit[0])
+		return fmt.Errorf("%v: %w", absLinkSplit[0], FileNotFoundErr)
 	}
 
 	if len(absLinkSplit) == 1 {
@@ -496,7 +497,7 @@ func (l localLinksCache) Lookup(absLink string) error {
 			return nil
 		}
 	}
-	return errors.Wrapf(IDNotFoundErr, "link %v, existing ids: %v", absLink, *ids)
+	return fmt.Errorf("link %v, existing ids: %v: %w", absLink, *ids, IDNotFoundErr)
 }
 
 func (l localLinksCache) addRelLinks(localLink string) error {
@@ -508,7 +509,7 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrapf(err, "failed to stat %v", localLink)
+		return fmt.Errorf("failed to stat %v: %w", localLink, err)
 	}
 
 	if st.IsDir() {
@@ -520,7 +521,7 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 
 	file, err := os.Open(localLink)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open file %v", localLink)
+		return fmt.Errorf("failed to open file %v: %w", localLink, err)
 	}
 	defer file.Close()
 
@@ -533,7 +534,7 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 		b, err = reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				return errors.Wrapf(err, "failed to read file %v", localLink)
+				return fmt.Errorf("failed to read file %v: %w", localLink, err)
 			}
 			break
 		}

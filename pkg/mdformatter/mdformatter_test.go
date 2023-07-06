@@ -6,12 +6,11 @@ package mdformatter
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
-	"github.com/efficientgo/tools/core/pkg/testutil"
-	"github.com/go-kit/kit/log"
+	"github.com/efficientgo/core/testutil"
+	"github.com/go-kit/log"
 )
 
 func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
@@ -21,7 +20,7 @@ func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 
 	f := New(context.Background())
 
-	exp, err := ioutil.ReadFile("testdata/formatted.md")
+	exp, err := os.ReadFile("testdata/formatted.md")
 	testutil.Ok(t, err)
 
 	t.Run("Format not formatted", func(t *testing.T) {
@@ -50,7 +49,7 @@ func TestCheck_NoTransformers(t *testing.T) {
 	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted.md"})
 	testutil.Ok(t, err)
 
-	exp, err := ioutil.ReadFile("testdata/not_formatted.md.diff")
+	exp, err := os.ReadFile("testdata/not_formatted.md.diff")
 	testutil.Ok(t, err)
 	testutil.Equals(t, string(exp), diff.String())
 }
@@ -85,7 +84,7 @@ func TestFormat_FormatSingle_Transformers(t *testing.T) {
 	f := New(context.Background())
 	f.link = m
 
-	exp, err := ioutil.ReadFile("testdata/formatted_and_transformed.md")
+	exp, err := os.ReadFile("testdata/formatted_and_transformed.md")
 	testutil.Ok(t, err)
 
 	t.Run("Format not formatted", func(t *testing.T) {
@@ -115,7 +114,7 @@ func TestFormat_FormatSingle_SoftWraps(t *testing.T) {
 
 	f := New(context.Background(), WithSoftWraps())
 
-	exp, err := ioutil.ReadFile("testdata/formatted_softwraps.md")
+	exp, err := os.ReadFile("testdata/formatted_softwraps.md")
 	testutil.Ok(t, err)
 
 	t.Run("Format not formatted", func(t *testing.T) {
@@ -144,7 +143,39 @@ func TestCheck_SoftWraps(t *testing.T) {
 	diff, err = IsFormatted(context.Background(), log.NewNopLogger(), []string{"testdata/not_formatted_softwraps.md"}, WithSoftWraps())
 	testutil.Ok(t, err)
 
-	exp, err := ioutil.ReadFile("testdata/not_formatted_softwraps.md.diff")
+	exp, err := os.ReadFile("testdata/not_formatted_softwraps.md.diff")
 	testutil.Ok(t, err)
 	testutil.Equals(t, string(exp), diff.String())
+}
+
+func TestFormatBadlyFormattedGoCode(t *testing.T) {
+	t.Run("Format without WithCodeFmt", func(t *testing.T) {
+		file, err := os.OpenFile("testdata/badly_formatted_go_code.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file.Close()
+
+		f := New(context.Background())
+
+		exp, err := os.ReadFile("testdata/badly_formatted_go_code.md")
+		testutil.Ok(t, err)
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
+
+	t.Run("Format", func(t *testing.T) {
+		file, err := os.OpenFile("testdata/badly_formatted_go_code.md", os.O_RDONLY, 0)
+		testutil.Ok(t, err)
+		defer file.Close()
+
+		f := New(context.Background(), WithCodeFmt())
+
+		exp, err := os.ReadFile("testdata/badly_formatted_go_code.reformatted.md")
+		testutil.Ok(t, err)
+
+		buf := bytes.Buffer{}
+		testutil.Ok(t, f.Format(file, &buf))
+		testutil.Equals(t, string(exp), buf.String())
+	})
 }

@@ -6,18 +6,17 @@ package mdgen
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/core/pkg/testutil"
+	"github.com/efficientgo/core/testutil"
 )
 
 func TestFormat_FormatSingle_CodeBlockTransformer(t *testing.T) {
 	f := mdformatter.New(context.Background(), mdformatter.WithCodeBlockTransformer(NewCodeBlockTransformer()))
 
-	exp, err := ioutil.ReadFile("testdata/mdgen_formatted.md")
+	exp, err := os.ReadFile("testdata/mdgen_formatted.md")
 	testutil.Ok(t, err)
 
 	t.Run("Format not formatted", func(t *testing.T) {

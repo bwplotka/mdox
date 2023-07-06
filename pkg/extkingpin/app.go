@@ -12,9 +12,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log"
 )
 
 type FlagClause interface {
@@ -55,7 +54,7 @@ func NewApp(app *kingpin.Application) *App {
 func (a *App) Parse() (cmd string, runner Run) {
 	cmd, err := a.app.Parse(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, errors.Wrapf(err, "error parsing commandline arguments: %v", os.Args))
+		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("error parsing commandline arguments: %v: %w", os.Args, err))
 		a.app.Usage(os.Args[1:])
 		os.Exit(2)
 	}

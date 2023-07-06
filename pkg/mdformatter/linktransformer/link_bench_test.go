@@ -6,14 +6,13 @@ package linktransformer
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/mdformatter"
-	"github.com/efficientgo/tools/core/pkg/testutil"
-	"github.com/go-kit/kit/log"
+	"github.com/efficientgo/core/testutil"
+	"github.com/go-kit/log"
 )
 
 var testBuf bytes.Buffer
@@ -35,13 +34,13 @@ This is a test section [link](./doc.md#this-is-a-section)`
 )
 
 func benchLinktransformer(b *testing.B) {
-	tmpDir, err := ioutil.TempDir("", "bench-test")
+	tmpDir, err := os.MkdirTemp("", "bench-test")
 	testutil.Ok(b, err)
 	b.Cleanup(func() { testutil.Ok(b, os.RemoveAll(tmpDir)) })
 
 	testutil.Ok(b, os.MkdirAll(filepath.Join(tmpDir, "repo", "docs"), os.ModePerm))
-	testutil.Ok(b, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc.md"), []byte(testDoc), os.ModePerm))
-	testutil.Ok(b, ioutil.WriteFile(filepath.Join(tmpDir, "repo", "docs", "links.md"), []byte(testDocWithLink), os.ModePerm))
+	testutil.Ok(b, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "doc.md"), []byte(testDoc), os.ModePerm))
+	testutil.Ok(b, os.WriteFile(filepath.Join(tmpDir, "repo", "docs", "links.md"), []byte(testDocWithLink), os.ModePerm))
 	anchorDir := filepath.Join(tmpDir, "repo", "docs")
 	logger := log.NewLogfmtLogger(os.Stderr)
 

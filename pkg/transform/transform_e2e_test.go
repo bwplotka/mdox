@@ -6,15 +6,14 @@ package transform_test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/bwplotka/mdox/pkg/transform"
-	"github.com/efficientgo/tools/core/pkg/testutil"
-	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
+	"github.com/efficientgo/core/testutil"
+	"github.com/go-kit/log"
 )
 
 func TestTransform(t *testing.T) {
@@ -28,20 +27,20 @@ func TestTransform(t *testing.T) {
 
 	testutil.Ok(t, os.RemoveAll(tmpDir))
 	t.Run("mdox1.yaml", func(t *testing.T) {
-		mdox1, err := ioutil.ReadFile(filepath.Join(testData, "mdox1.yaml"))
+		mdox1, err := os.ReadFile(filepath.Join(testData, "mdox1.yaml"))
 		testutil.Ok(t, err)
 		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox1))
 		assertDirContent(t, filepath.Join(testData, "expected", "test1"), filepath.Join(tmpDir, "test1"))
 	})
 	t.Run("mdox2.yaml", func(t *testing.T) {
-		mdox2, err := ioutil.ReadFile(filepath.Join(testData, "mdox2.yaml"))
+		mdox2, err := os.ReadFile(filepath.Join(testData, "mdox2.yaml"))
 		testutil.Ok(t, err)
 		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox2))
 		assertDirContent(t, filepath.Join(testData, "expected", "test2"), filepath.Join(tmpDir, "test2"))
 
 	})
 	t.Run("mdox3.yaml", func(t *testing.T) {
-		mdox2, err := ioutil.ReadFile(filepath.Join(testData, "mdox3.yaml"))
+		mdox2, err := os.ReadFile(filepath.Join(testData, "mdox3.yaml"))
 		testutil.Ok(t, err)
 		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox2))
 		assertDirContent(t, filepath.Join(testData, "expected", "test3"), filepath.Join(tmpDir, "test3"))
@@ -68,7 +67,7 @@ func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
 				return err
 			}
 			if !e.IsDir() {
-				return errors.Errorf("%v is not a dir, but expected dir", e)
+				return fmt.Errorf("%v is not a dir, but expected dir", e)
 			}
 			return nil
 		}
@@ -78,19 +77,19 @@ func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
 			return err
 		}
 		if e.IsDir() {
-			return errors.Errorf("%v is a dir, but not expected a dir, but file", e)
+			return fmt.Errorf("%v is a dir, but not expected a dir, but file", e)
 		}
 
-		expectedContent, err := ioutil.ReadFile(path)
+		expectedContent, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		content, err := ioutil.ReadFile(expectedPath)
+		content, err := os.ReadFile(expectedPath)
 		if err != nil {
 			return err
 		}
 		if !bytes.Equal(expectedContent, content) {
-			return errors.Errorf("expected (from %v):\n %v\n ..got (in %v):\n %v\n", path, string(expectedContent), expectedPath, string(content))
+			return fmt.Errorf("expected (from %v):\n %v\n ..got (in %v):\n %v\n", path, string(expectedContent), expectedPath, string(content))
 		}
 		return nil
 	}))

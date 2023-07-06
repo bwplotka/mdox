@@ -6,20 +6,19 @@ package mdformatter
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"time"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/bwplotka/mdox/pkg/gitdiff"
-	"github.com/efficientgo/tools/core/pkg/logerrcapture"
-	"github.com/efficientgo/tools/core/pkg/merrors"
-	"github.com/go-kit/kit/log"
+	"github.com/efficientgo/core/logerrcapture"
+	"github.com/efficientgo/core/merrors"
+	"github.com/go-kit/log"
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/theckman/yacspin"
 	"github.com/yuin/goldmark"
@@ -84,9 +83,10 @@ type Formatter struct {
 	bm   BackMatterTransformer
 	link LinkTransformer
 	cb   CodeBlockTransformer
+	reg  *prometheus.Registry
 
-	reg       *prometheus.Registry
 	softWraps bool
+	codeFmt   bool
 }
 
 // Option is a functional option type for Formatter objects.
@@ -134,6 +134,13 @@ func WithSoftWraps() Option {
 	}
 }
 
+// WithCodeFmt specifies that we shouldn't reformat code snippets.
+func WithCodeFmt() Option {
+	return func(m *Formatter) {
+		m.codeFmt = true
+	}
+}
+
 func New(ctx context.Context, opts ...Option) *Formatter {
 	f := &Formatter{
 		ctx: ctx,
@@ -178,7 +185,7 @@ func FormatFrontMatter(m map[string]interface{}) ([]byte, error) {
 	b := bytes.NewBuffer([]byte("---\n"))
 	o, err := yaml.Marshal(f)
 	if err != nil {
-		return nil, errors.Wrap(err, "marshall front matter")
+		return nil, fmt.Errorf("marshall front matter: %w", err)
 	}
 	_, _ = b.Write(o)
 	_, _ = b.Write([]byte("---\n\n"))
@@ -202,7 +209,7 @@ func (f sortedFrontMatter) MarshalYAML() (interface{}, error) {
 
 		b, err := yaml.Marshal(f.m[k])
 		if err != nil {
-			return nil, errors.Wrap(err, "map marshal")
+			return nil, fmt.Errorf("map marshal: %w", err)
 		}
 		v := &yaml.Node{}
 		if err := yaml.Unmarshal(b, v); err != nil {
@@ -211,7 +218,7 @@ func (f sortedFrontMatter) MarshalYAML() (interface{}, error) {
 
 		// We expect a node of type document with single content containing other nodes.
 		if len(v.Content) != 1 {
-			return nil, errors.Errorf("unexpected node after unmarshalling interface: %#v", v)
+			return nil, fmt.Errorf("unexpected node after unmarshalling interface: %#v", v)
 		}
 		// TODO(bwplotka): This creates weird indentation, fix it.
 		n.Content = append(n.Content, v.Content[0])
@@ -303,7 +310,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 
 			file, err := os.OpenFile(fn, os.O_RDWR, 0)
 			if err != nil {
-				return errors.Wrapf(err, "open %v", fn)
+				return fmt.Errorf("open %v: %w", fn, err)
 			}
 			defer logerrcapture.ExhaustClose(logger, file, "close file %v", fn)
 
@@ -317,9 +324,9 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 					return err
 				}
 
-				in, err := ioutil.ReadAll(file)
+				in, err := io.ReadAll(file)
 				if err != nil {
-					return errors.Wrapf(err, "read all %v", fn)
+					return fmt.Errorf("read all %v: %w", fn, err)
 				}
 
 				if !bytes.Equal(in, b.Bytes()) {
@@ -330,7 +337,7 @@ func format(ctx context.Context, logger log.Logger, files []string, diffs *Diffs
 
 			n, err := file.WriteAt(b.Bytes(), 0)
 			if err != nil {
-				return errors.Wrapf(err, "write %v", fn)
+				return fmt.Errorf("write %v: %w", fn, err)
 			}
 			timeTaken := time.Since(startTime)
 			m.perFileLatency.WithLabelValues(fn).Observe(timeTaken.Seconds())
@@ -351,9 +358,9 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		Filepath: file.Name(),
 	}
 
-	b, err := ioutil.ReadAll(file)
+	b, err := io.ReadAll(file)
 	if err != nil {
-		return errors.Wrapf(err, "read %v", file.Name())
+		return fmt.Errorf("read %v: %w", file.Name(), err)
 	}
 	content := b
 	frontMatter := map[string]interface{}{}
@@ -396,6 +403,10 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	if f.softWraps {
 		renderer.AddMarkdownOptions(markdown.WithSoftWraps())
 	}
+	// Enable Go code reformatting unless --no-code-fmt is set.
+	if f.codeFmt {
+		renderer.AddMarkdownOptions(markdown.WithCodeFormatters(markdown.GoCodeFormatter))
+	}
 	tr := &transformer{
 		wrapped:   renderer,
 		sourceCtx: sourceCtx,
@@ -407,17 +418,17 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
 		goldmark.WithRenderer(nopOpsRenderer{Renderer: tr}),
 	).Convert(content, &tmp); err != nil {
-		return errors.Wrapf(err, "first formatting phase for %v", file.Name())
+		return fmt.Errorf("first formatting phase for %v: %w", file.Name(), err)
 	}
 	if err := tr.Close(sourceCtx); err != nil {
-		return errors.Wrapf(err, "%v", file.Name())
+		return fmt.Errorf("%v: %w", file.Name(), err)
 	}
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
 		goldmark.WithRenderer(renderer), // No transforming for second phase.
 	).Convert(tmp.Bytes(), out); err != nil {
-		return errors.Wrapf(err, "second formatting phase for %v", file.Name())
+		return fmt.Errorf("second formatting phase for %v: %w", file.Name(), err)
 	}
 	return nil
 }

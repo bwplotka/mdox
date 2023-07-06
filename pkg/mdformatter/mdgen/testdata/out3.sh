@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-echo "test output3"
+echo -n "test output3"
 exit 2
