@@ -13,11 +13,8 @@ import (
 	"regexp"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/pkg/errors"
-=======
->>>>>>> b900e5ffcabb79b9c5ff764fd6bbb5b931315a0a
 	"gopkg.in/yaml.v3"
 )
 
