@@ -13,7 +13,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/gobwas/glob v0.2.3
 	github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0
-	github.com/gohugoio/hugo v0.115.0
+	github.com/gohugoio/hugo v0.116.1
 	github.com/mattn/go-isatty v0.0.19
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mattn/go-sqlite3 v1.14.17
