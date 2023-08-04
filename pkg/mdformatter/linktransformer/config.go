@@ -13,13 +13,14 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/bwplotka/mdox/pkg/cache"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	Version int
 
-	Cache CacheConfig `yaml:"cache"`
+	Cache cache.Config `yaml:"cache"`
 
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
 	Validators              []ValidatorConfig `yaml:"validators"`
@@ -32,14 +33,6 @@ type Config struct {
 
 	timeout     time.Duration
 	randomDelay time.Duration
-}
-
-type CacheConfig struct {
-	Type     string `yaml:"type"`
-	Validity string `yaml:"validity"`
-	Jitter   string `yaml:"jitter"`
-	validity time.Duration
-	jitter   time.Duration
 }
 
 type ValidatorConfig struct {
@@ -78,12 +71,6 @@ const (
 
 const (
 	gitHubAPIURL = "https://api.github.com/repos/%v/%v?sort=created&direction=desc&per_page=1"
-
-	none   = "None"
-	sqlite = "SQLite"
-
-	timeDay              = 24 * time.Hour
-	defaultCacheValidity = 5 * timeDay
 )
 
 type GitHubResponse struct {
@@ -91,7 +78,7 @@ type GitHubResponse struct {
 }
 
 func ParseConfig(c []byte) (Config, error) {
-	cfg := Config{Cache: CacheConfig{Validity: defaultCacheValidity.String()}}
+	cfg := Config{Cache: cache.NewConfig()}
 	dec := yaml.NewDecoder(bytes.NewReader(c))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
@@ -116,28 +103,6 @@ func ParseConfig(c []byte) (Config, error) {
 
 	if cfg.Parallelism < 0 {
 		return Config{}, errors.New("parsing parallelism, has to be > 0")
-	}
-
-	switch cfg.Cache.Type {
-	case sqlite:
-		if cfg.Cache.Validity != "" {
-			var err error
-			cfg.Cache.validity, err = time.ParseDuration(cfg.Cache.Validity)
-			if err != nil {
-				return Config{}, fmt.Errorf("parsing cache validity duration: %w", err)
-			}
-		}
-
-		if cfg.Cache.Jitter != "" {
-			var err error
-			cfg.Cache.jitter, err = time.ParseDuration(cfg.Cache.Jitter)
-			if err != nil {
-				return Config{}, fmt.Errorf("parsing cache jitter duration: %w", err)
-			}
-		}
-	case none, "":
-	default:
-		return Config{}, errors.New("unsupported cache type")
 	}
 
 	if len(cfg.Validators) <= 0 {

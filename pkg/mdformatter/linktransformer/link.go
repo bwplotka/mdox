@@ -264,9 +264,9 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.c.SetRequestTimeout(config.timeout)
 	}
 
-	if v.validateConfig.Cache.Type != none && storage != nil {
+	if v.validateConfig.Cache.IsSet() && storage != nil {
 		v.storage = storage
-		if err = v.storage.Init(v.validateConfig.Cache.validity, v.validateConfig.Cache.jitter); err != nil {
+		if err = v.storage.Init(v.validateConfig.Cache.Validity, v.validateConfig.Cache.Jitter); err != nil {
 			return nil, err
 		}
 	}
