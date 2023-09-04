@@ -23,7 +23,7 @@ require (
 	github.com/prometheus/common v0.44.0
 	github.com/sergi/go-diff v1.0.0
 	github.com/theckman/yacspin v0.13.12
-	github.com/yuin/goldmark v1.5.5
+	github.com/yuin/goldmark v1.5.6
 	golang.org/x/net v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 )
