@@ -24,7 +24,7 @@ require (
 	github.com/sergi/go-diff v1.0.0
 	github.com/theckman/yacspin v0.13.12
 	github.com/yuin/goldmark v1.5.6
-	golang.org/x/net v0.14.0
+	golang.org/x/net v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -76,8 +76,8 @@ require (
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
