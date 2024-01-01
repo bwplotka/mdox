@@ -127,8 +127,8 @@ github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJA
 github.com/gocolly/colly v1.2.0/go.mod h1:Hof5T3ZswNVsOHYmba1u03W65HDWgpV5HifSuueE0EA=
 github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0 h1:f+kHjWsqjft+/nCpQ6TcV3Lgs4lc+6rvBt2sfL4XsbE=
 github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0/go.mod h1:I2MuhsLjQ+Ex+IzK3afNS8/1qP3AedHOusRPcRdC5o0=
-github.com/gohugoio/hugo v0.120.3 h1:PwIZ/frBealnRdBpkpjd4fWA2sLMI0aDBf8mPtrIVJw=
-github.com/gohugoio/hugo v0.120.3/go.mod h1:ZogFi7Iv3kRSSJDDguNsF219M4mGllg44IMvw/z/tEA=
+github.com/gohugoio/hugo v0.120.4 h1:AO/JFAHgrIKFnApCjpfQuyvI82t3yLgFZic4dg5l9OE=
+github.com/gohugoio/hugo v0.120.4/go.mod h1:ZogFi7Iv3kRSSJDDguNsF219M4mGllg44IMvw/z/tEA=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
