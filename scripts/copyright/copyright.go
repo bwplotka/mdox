@@ -46,7 +46,7 @@ func applyLicenseToProtoAndGo() error {
 			return err
 		}
 
-		if !strings.HasPrefix(string(b), string(license)) {
+		if !bytes.HasPrefix(b, license) {
 			log.Println("file", path, "is missing Copyright header. Adding.")
 
 			var bb bytes.Buffer

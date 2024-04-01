@@ -182,13 +182,13 @@ func FormatFrontMatter(m map[string]interface{}) ([]byte, error) {
 		keys: keys,
 	}
 
-	b := bytes.NewBuffer([]byte("---\n"))
+	b := bytes.NewBufferString("---\n")
 	o, err := yaml.Marshal(f)
 	if err != nil {
 		return nil, fmt.Errorf("marshall front matter: %w", err)
 	}
 	_, _ = b.Write(o)
-	_, _ = b.Write([]byte("---\n\n"))
+	_, _ = b.WriteString("---\n\n")
 	return b.Bytes(), nil
 }
 
