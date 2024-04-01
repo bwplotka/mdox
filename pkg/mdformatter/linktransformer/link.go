@@ -173,7 +173,7 @@ func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destinat
 	return absLinkToRelLink(newDest, ctx.Filepath)
 }
 
-func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
+func (*localizer) Close(mdformatter.SourceContext) error { return nil }
 
 type validator struct {
 	logger         log.Logger

@@ -28,7 +28,7 @@ func NewCodeBlockTransformer() *genCodeBlockTransformer {
 	return &genCodeBlockTransformer{}
 }
 
-func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceContext, infoString []byte, code []byte) ([]byte, error) {
+func (*genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceContext, infoString []byte, code []byte) ([]byte, error) {
 	if len(infoString) == 0 {
 		return code, nil
 	}
@@ -100,4 +100,4 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	panic("should never get here")
 }
 
-func (t *genCodeBlockTransformer) Close(ctx mdformatter.SourceContext) error { return nil }
+func (*genCodeBlockTransformer) Close(_ mdformatter.SourceContext) error { return nil }
