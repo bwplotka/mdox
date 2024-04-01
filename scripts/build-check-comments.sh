@@ -12,7 +12,7 @@ set -eu
 #
 # Checks Go code comments if they have trailing period (excludes protobuffers and vendor files).
 # Comments with more than 3 spaces at beginning are omitted from the check, example: '//    - foo'.
-# This does not include top-level commments for funcs and types.
+# This does not include top-level comments for funcs and types.
 #
 # Example:
 #   func main() {

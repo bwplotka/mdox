@@ -177,7 +177,7 @@ So passing in regex such as `--links.localize.address-regex="https:\/\/example\.
 
 ### Transformation
 
-mdox allows various types of markdown file transformation which are useful for website pre-processing and is often required when using static site generators like Hugo. It helps in generating front/backmatter, renaming and moving files, and converts links to work on websites.
+mdox allows various types of markdown file transformation which are useful for website pre-processing and is often required when using static site generators like Hugo. It helps in generating front/backmatter, renaming, and moving files, and converts links to work on websites.
 
 Just run `mdox transform --config-file=.mdox.yaml` and pass in YAML configuration.
 

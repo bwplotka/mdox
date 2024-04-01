@@ -34,12 +34,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		return code, nil
 	}
 
-	infoFiels, err := shellwords.NewParser().Parse(string(infoString))
+	infoFields, err := shellwords.NewParser().Parse(string(infoString))
 	if err != nil {
 		return nil, fmt.Errorf("parsing info string %v: %w", string(infoString), err)
 	}
 	infoStringAttr := map[string]string{}
-	for i, field := range infoFiels {
+	for i, field := range infoFields {
 		val := []string{field}
 		if i := strings.Index(field, "="); i != -1 {
 			val = []string{field[:i], field[i+1:]}
