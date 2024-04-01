@@ -134,7 +134,7 @@ func (s *SQLite3Storage) IsCached(URL string) (bool, error) {
 	row := statement.QueryRow(URL)
 	if err = row.Scan(&timestamp); err != nil {
 		// If ErrNoRows then it means URL is new, so need to call Visited.
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err

@@ -532,11 +532,11 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 	reader := bufio.NewReader(file)
 	for {
 		b, err = reader.ReadBytes('\n')
-		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("failed to read file %v: %w", localLink, err)
-			}
+		if errors.Is(err, io.EOF) {
 			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read file %v: %w", localLink, err)
 		}
 
 		if bytes.HasPrefix(b, []byte(`#`)) {
