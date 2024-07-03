@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Kunde21/markdownfmt/v3 v3.1.0
-	github.com/alecthomas/kingpin/v2 v2.3.2
+	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
@@ -19,12 +19,12 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/oklog/run v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.17.0
-	github.com/prometheus/common v0.45.0
+	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/common v0.48.0
 	github.com/sergi/go-diff v1.0.0
 	github.com/theckman/yacspin v0.13.12
 	github.com/yuin/goldmark v1.6.0
-	golang.org/x/net v0.19.0
+	golang.org/x/net v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -58,15 +58,14 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/niklasfasching/go-org v1.7.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
-	github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16 // indirect
-	github.com/prometheus/procfs v0.11.1 // indirect
+	github.com/prometheus/client_model v0.5.0 // indirect
+	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/spf13/afero v1.10.0 // indirect
@@ -75,9 +74,9 @@ require (
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/yuin/goldmark-emoji v1.0.2 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
