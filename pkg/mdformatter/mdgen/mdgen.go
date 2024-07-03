@@ -5,6 +5,7 @@ package mdgen
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -19,9 +20,7 @@ const (
 	infoStringKeyExitCode = "mdox-expect-exit-code"
 )
 
-var (
-	newLineChar = []byte("\n")
-)
+var newLineChar = []byte("\n")
 
 type genCodeBlockTransformer struct{}
 
@@ -29,7 +28,7 @@ func NewCodeBlockTransformer() *genCodeBlockTransformer {
 	return &genCodeBlockTransformer{}
 }
 
-func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceContext, infoString []byte, code []byte) ([]byte, error) {
+func (*genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceContext, infoString []byte, code []byte) ([]byte, error) {
 	if len(infoString) == 0 {
 		return code, nil
 	}
@@ -82,12 +81,12 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 		cmd.Stdout = &b
 		if err := cmd.Run(); err != nil {
 			expectedCode, _ := strconv.Atoi(infoStringAttr[infoStringKeyExitCode])
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				if exitErr.ExitCode() != expectedCode {
-					return nil, fmt.Errorf("run %v, expected exit code %v, got %v, out: %v, error: %w", execCmd, expectedCode, exitErr.ExitCode(), b.String(), err)
-				}
-			} else {
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
 				return nil, fmt.Errorf("run %v, out: %v, error: %w", execCmd, b.String(), err)
+			}
+			if exitErr.ExitCode() != expectedCode {
+				return nil, fmt.Errorf("run %v, expected exit code %v, got %v, out: %v, error: %w", execCmd, expectedCode, exitErr.ExitCode(), b.String(), err)
 			}
 		}
 		output := b.Bytes()
@@ -101,4 +100,4 @@ func (t *genCodeBlockTransformer) TransformCodeBlock(ctx mdformatter.SourceConte
 	panic("should never get here")
 }
 
-func (t *genCodeBlockTransformer) Close(ctx mdformatter.SourceContext) error { return nil }
+func (*genCodeBlockTransformer) Close(_ mdformatter.SourceContext) error { return nil }

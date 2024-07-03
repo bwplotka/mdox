@@ -173,7 +173,7 @@ func (l *localizer) TransformDestination(ctx mdformatter.SourceContext, destinat
 	return absLinkToRelLink(newDest, ctx.Filepath)
 }
 
-func (l *localizer) Close(mdformatter.SourceContext) error { return nil }
+func (*localizer) Close(mdformatter.SourceContext) error { return nil }
 
 type validator struct {
 	logger         log.Logger
@@ -532,11 +532,11 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 	reader := bufio.NewReader(file)
 	for {
 		b, err = reader.ReadBytes('\n')
-		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("failed to read file %v: %w", localLink, err)
-			}
+		if errors.Is(err, io.EOF) {
 			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read file %v: %w", localLink, err)
 		}
 
 		if bytes.HasPrefix(b, []byte(`#`)) {

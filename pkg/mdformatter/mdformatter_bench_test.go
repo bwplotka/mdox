@@ -14,7 +14,9 @@ import (
 
 var testBuf bytes.Buffer
 
-func benchMdformatter(filename string, b *testing.B) {
+func benchMdformatter(b *testing.B, filename string) {
+	b.Helper()
+
 	file, err := os.OpenFile(filename, os.O_RDONLY, 0)
 	testutil.Ok(b, err)
 	defer file.Close()
@@ -28,4 +30,4 @@ func benchMdformatter(filename string, b *testing.B) {
 	})
 }
 
-func Benchmark_Mdformatter(b *testing.B) { benchMdformatter("testdata/not_formatted.md", b) }
+func Benchmark_Mdformatter(b *testing.B) { benchMdformatter(b, "testdata/not_formatted.md") }

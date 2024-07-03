@@ -361,7 +361,7 @@ func (r *relLinkTransformer) TransformDestination(ctx mdformatter.SourceContext,
 	return []byte(newDest), nil
 }
 
-func (r *relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
+func (*relLinkTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 type frontMatterTransformer struct {
 	localLinksStyle LocalLinksStyle
@@ -419,9 +419,9 @@ func (f *frontMatterTransformer) TransformFrontMatter(ctx mdformatter.SourceCont
 	return mdformatter.FormatFrontMatter(m)
 }
 
-func (f *frontMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
+func (*frontMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
 
-func (f *backMatterTransformer) TransformBackMatter(ctx mdformatter.SourceContext) ([]byte, error) {
+func (f *backMatterTransformer) TransformBackMatter(_ mdformatter.SourceContext) ([]byte, error) {
 	b := bytes.Buffer{}
 	if err := f.b._template.Execute(&b, struct {
 		Origin MatterOrigin
@@ -442,7 +442,7 @@ func (f *backMatterTransformer) TransformBackMatter(ctx mdformatter.SourceContex
 	return m, nil
 }
 
-func (f *backMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
+func (*backMatterTransformer) Close(mdformatter.SourceContext) error { return nil }
 
 func firstMatch(absRelPath string, trs []*TransformationConfig) (*TransformationConfig, bool) {
 	for _, tr := range trs {

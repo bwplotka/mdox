@@ -39,12 +39,15 @@ linters:
     - gosimple
     - govet
     - ineffassign
+    # - mirror  # requires golangci-lint 1.53
     - misspell
     - staticcheck
     - structcheck
+    - thelper
     - typecheck
     - unparam
     - unused
+    - usestdlibvars
     - varcheck
 
 linters-settings:

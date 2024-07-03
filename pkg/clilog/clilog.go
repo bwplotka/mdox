@@ -57,7 +57,10 @@ func New(w io.Writer) log.Logger {
 }
 
 func (l logger) Log(keyvals ...interface{}) error {
-	buf := bufPool.Get().(*buf)
+	buf, ok := bufPool.Get().(*buf)
+	if !ok {
+		return errors.New("invalid buffer")
+	}
 	buf.Reset()
 	defer bufPool.Put(buf)
 
@@ -152,14 +155,17 @@ func (enc *Encoder) EncodeKeyvals(keyvals ...interface{}) error {
 	for i := 0; i < len(keyvals); i += 2 {
 		k, v := keyvals[i], keyvals[i+1]
 		err := enc.EncodeKeyval(k, v)
-		if err == ErrUnsupportedKeyType {
+
+		var marshalError *MarshalerError
+		switch {
+		case errors.Is(err, ErrUnsupportedKeyType):
 			continue
-		}
-		if _, ok := err.(*MarshalerError); ok || err == ErrUnsupportedValueType {
+		case
+			errors.As(err, &marshalError),
+			errors.Is(err, ErrUnsupportedValueType):
 			v = err
-			err = enc.EncodeKeyval(k, v)
-		}
-		if err != nil {
+			return enc.EncodeKeyval(k, v)
+		case err != nil:
 			return err
 		}
 	}

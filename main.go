@@ -102,6 +102,7 @@ func main() {
 		// TODO(bwplotka): Move to customized better setup function.
 		return runner(ctx, logger)
 	}, func(err error) {
+		level.Error(logger).Log("err", fmt.Errorf("%s runner failed: %w", cmd, err))
 		cancel()
 	})
 

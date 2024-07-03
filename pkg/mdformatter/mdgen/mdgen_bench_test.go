@@ -15,7 +15,9 @@ import (
 
 var testBuf bytes.Buffer
 
-func benchMdgen(filename string, b *testing.B) {
+func benchMdgen(b *testing.B, filename string) {
+	b.Helper()
+
 	file, err := os.OpenFile(filename, os.O_RDONLY, 0)
 	testutil.Ok(b, err)
 	defer file.Close()
@@ -30,8 +32,8 @@ func benchMdgen(filename string, b *testing.B) {
 	})
 }
 
-func Benchmark_Mdgen_Sleep2(b *testing.B) { benchMdgen("benchdata/sleep2.md", b) }
+func Benchmark_Mdgen_Sleep2(b *testing.B) { benchMdgen(b, "benchdata/sleep2.md") }
 
-func Benchmark_Mdgen_Sleep5(b *testing.B) { benchMdgen("benchdata/sleep5.md", b) }
+func Benchmark_Mdgen_Sleep5(b *testing.B) { benchMdgen(b, "benchdata/sleep5.md") }
 
-func Benchmark_Mdgen_GoHelp(b *testing.B) { benchMdgen("benchdata/gohelp.md", b) }
+func Benchmark_Mdgen_GoHelp(b *testing.B) { benchMdgen(b, "benchdata/gohelp.md") }

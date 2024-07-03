@@ -5,6 +5,7 @@ package mdformatter
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"regexp"
 	"strconv"
@@ -102,7 +103,8 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 				}
 				out += token.String()
 			}
-			if err := z.Err(); err != nil && err != io.EOF {
+
+			if err := z.Err(); err != nil && !errors.Is(err, io.EOF) {
 				return ast.WalkStop, err
 			}
 

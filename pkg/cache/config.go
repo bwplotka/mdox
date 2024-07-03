@@ -50,10 +50,7 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode(c.cacheParser); err != nil {
 		return err
 	}
-	if err := c.load(); err != nil {
-		return err
-	}
-	return nil
+	return c.load()
 }
 
 // load validates the cache configuration from the parser and copy it
