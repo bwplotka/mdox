@@ -148,14 +148,14 @@ func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int
 	client := &http.Client{}
 
 	// Check latest pull request number.
-	reqPull, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "pulls"), nil)
+	reqPull, err := http.NewRequest(http.MethodGet, fmt.Sprintf(gitHubAPIURL, reponame, "pulls"), nil)
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
 	reqPull.Header.Set("User-Agent", "mdox")
 
 	// Check latest issue number and return whichever is greater.
-	reqIssue, err := http.NewRequest("GET", fmt.Sprintf(gitHubAPIURL, reponame, "issues"), nil)
+	reqIssue, err := http.NewRequest(http.MethodGet, fmt.Sprintf(gitHubAPIURL, reponame, "issues"), nil)
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
@@ -170,7 +170,7 @@ func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
-	if respPull.StatusCode != 200 {
+	if respPull.StatusCode != http.StatusOK {
 		return nil, math.MaxInt64, fmt.Errorf("pulls API request failed. status code: %d", respPull.StatusCode)
 	}
 	defer respPull.Body.Close()
@@ -182,7 +182,7 @@ func getGitHubRegex(pullsIssuesRe string, repoToken string) (*regexp.Regexp, int
 	if err != nil {
 		return nil, math.MaxInt64, err
 	}
-	if respIssue.StatusCode != 200 {
+	if respIssue.StatusCode != http.StatusOK {
 		return nil, math.MaxInt64, fmt.Errorf("issues API request failed. status code: %d", respIssue.StatusCode)
 	}
 	defer respIssue.Body.Close()

@@ -46,6 +46,7 @@ linters:
     - typecheck
     - unparam
     - unused
+    - usestdlibvars
     - varcheck
 
 linters-settings:
