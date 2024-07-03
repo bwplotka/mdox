@@ -37,18 +37,18 @@ func TestTransform(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox2))
 		assertDirContent(t, filepath.Join(testData, "expected", "test2"), filepath.Join(tmpDir, "test2"))
-
 	})
 	t.Run("mdox3.yaml", func(t *testing.T) {
 		mdox2, err := os.ReadFile(filepath.Join(testData, "mdox3.yaml"))
 		testutil.Ok(t, err)
 		testutil.Ok(t, transform.Dir(context.Background(), logger, mdox2))
 		assertDirContent(t, filepath.Join(testData, "expected", "test3"), filepath.Join(tmpDir, "test3"))
-
 	})
 }
 
 func assertDirContent(t *testing.T, expectedDir string, gotDir string) {
+	t.Helper()
+
 	// TODO(bwplotka): Check if some garbage was not generated too!
 	testutil.Ok(t, filepath.Walk(expectedDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

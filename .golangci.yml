@@ -42,6 +42,7 @@ linters:
     - misspell
     - staticcheck
     - structcheck
+    - thelper
     - typecheck
     - unparam
     - unused

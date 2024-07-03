@@ -34,6 +34,8 @@ This is a test section [link](./doc.md#this-is-a-section)`
 )
 
 func benchLinktransformer(b *testing.B) {
+	b.Helper()
+
 	tmpDir, err := os.MkdirTemp("", "bench-test")
 	testutil.Ok(b, err)
 	b.Cleanup(func() { testutil.Ok(b, os.RemoveAll(tmpDir)) })
