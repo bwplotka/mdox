@@ -198,7 +198,7 @@ func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 }
 
 func registerFmt(_ context.Context, app *extkingpin.App, metricsPath *string) {
-	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (Github Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
+	cmd := app.Command("fmt", "Formats in-place given markdown files uniformly following GFM (GitHub Flavored Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md")
 	files := cmd.Arg("files", "Markdown file(s) to process.").Required().ExistingFiles()
 	checkOnly := cmd.Flag("check", "If true, fmt will not modify the given files, instead it will fail if files needs formatting").Bool()
 	softWraps := cmd.Flag("soft-wraps", "If true, fmt will preserve soft line breaks for given files").Bool()

@@ -258,8 +258,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	}
 
 	// Set very soft limits.
-	// E.g github has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
-	// on api (only search is below 100).
+	// E.g GitHub has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
+	// on API (only search is below 100).
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
 	}
@@ -551,7 +551,7 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 func toHeaderID(header []byte) string {
 	var id []byte
 	// Remove punctuation from header except '-' or '#'.
-	// '\p{L}\p{N}\p{M}' is the unicode equivalent of '\w', https://www.regular-expressions.info/unicode.html.
+	// '\p{L}\p{N}\p{M}' is the Unicode equivalent of '\w', https://www.regular-expressions.info/unicode.html.
 	punctuation := regexp.MustCompile(`[^\p{L}\p{N}\p{M}-# ]`)
 	header = punctuation.ReplaceAll(header, []byte(""))
 	headerText := bytes.TrimLeft(bytes.ToLower(header), "#")

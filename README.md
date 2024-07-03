@@ -2,7 +2,7 @@
 
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/bwplotka/mdox) [![Latest Release](https://img.shields.io/github/release/bwplotka/mdox.svg?style=flat-square)](https://github.com/bwplotka/mdox/releases/latest) [![CI](https://github.com/bwplotka/mdox/workflows/go/badge.svg)](https://github.com/bwplotka/mdox/actions?query=workflow%3Ago) [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mdox)](https://goreportcard.com/report/github.com/bwplotka/mdox) [![Slack](https://img.shields.io/badge/join%20slack-%23mdox-brightgreen.svg)](https://cloud-native.slack.com/archives/mdox)
 
-`mdox` (spelled as `md docs`) is a CLI for maintaining automated, high-quality project documentation and website leveraging [Github Flavored Markdown](https://github.github.com/gfm/) and git.
+`mdox` (spelled as `md docs`) is a CLI for maintaining automated, high-quality project documentation and website leveraging [GitHub Flavored Markdown](https://github.github.com/gfm/) and git.
 
 This project can be used both as CLI as well as a library.
 
@@ -34,7 +34,7 @@ For example, this README is formatted by the CI on every PR using [`mdox fmt -l 
 ```bash mdox-exec="mdox fmt --help"
 usage: mdox fmt [<flags>] <files>...
 
-Formats in-place given markdown files uniformly following GFM (Github Flavored
+Formats in-place given markdown files uniformly following GFM (GitHub Flavored
 Markdown: https://github.github.com/gfm/). Example: mdox fmt *.md
 
 
@@ -177,7 +177,7 @@ So passing in regex such as `--links.localize.address-regex="https:\/\/example\.
 
 ### Transformation
 
-mdox allows various types of markdown file transformation which are useful for website pre-processing and is often required when using static site generators like Hugo. It helps in generating front/backmatter, renaming and moving files, and converts links to work on websites.
+mdox allows various types of markdown file transformation which are useful for website pre-processing and is often required when using static site generators like Hugo. It helps in generating front/backmatter, renaming, and moving files, and converts links to work on websites.
 
 Just run `mdox transform --config-file=.mdox.yaml` and pass in YAML configuration.
 
@@ -280,7 +280,7 @@ YAML can be passed in directly as well using `--config` flag! For more details [
 Requirements to build this tool:
 
 * Go 1.19+
-* Linux or MacOS
+* Linux or macOS
 
 ```shell
 go install github.com/bwplotka/mdox@latest

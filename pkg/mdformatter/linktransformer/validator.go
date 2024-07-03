@@ -13,7 +13,7 @@ type Validator interface {
 	IsValid(k futureKey, r *validator) (bool, error)
 }
 
-// GitHubPullsIssuesValidator.IsValid skips visiting all github issue/PR links.
+// GitHubPullsIssuesValidator.IsValid skips visiting all GitHub issue/PR links.
 func (v GitHubPullsIssuesValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.l.githubSkippedLinks.Inc()
 	// Find rightmost index of match i.e, where regex match ends.
@@ -31,7 +31,7 @@ func (v GitHubPullsIssuesValidator) IsValid(k futureKey, r *validator) (bool, er
 	return false, nil
 }
 
-// RoundTripValidator.IsValid returns true if url is checked by colly or it is a valid local link.
+// RoundTripValidator.IsValid returns true if URL is checked by colly or it is a valid local link.
 func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	matches := remoteLinkPrefixRe.FindAllStringIndex(k.dest, 1)
 	if matches == nil && r.validateConfig.ExplicitLocalValidators {
