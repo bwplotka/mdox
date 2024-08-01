@@ -9,7 +9,7 @@ require (
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/efficientgo/tools/extkingpin v0.0.0-20230505153745-6b7392939a60
 	github.com/fatih/structtag v1.2.0
-	github.com/felixge/fgprof v0.9.3
+	github.com/felixge/fgprof v0.9.4
 	github.com/go-kit/log v0.2.1
 	github.com/gobwas/glob v0.2.3
 	github.com/gocolly/colly/v2 v2.1.1-0.20201013153555-8252c346cfb0
@@ -52,7 +52,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
+	github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
