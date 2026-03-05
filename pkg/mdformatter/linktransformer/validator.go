@@ -113,7 +113,6 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	}
 
 	r.l.roundTripVisitedLinks.Inc()
-	r.c.WithTransport(r.transportFn(k.dest))
 	if err := r.c.Visit(k.dest); err != nil {
 		r.remoteLinks[k.dest] = fmt.Errorf("remote link %v: %w", k.dest, err)
 		return false, nil

@@ -150,7 +150,7 @@ validators:
 
 As seen above, mdox supports validate configuration supports a few parameters and passing an array of link validators with types and regexes. The supported configuration parameters are:
 
-* `timeout`: The HTTP client's timeout. Defaults to "10s".
+* `timeout`: The HTTP client's timeout. When configured, it also sets the response header timeout. Defaults to "10s".
 * `parallelism`: The maximum amount of concurrent HTTP requests. Defaults to 100.
 * `host_max_conns`: The maximum amount of HTTP connections open per host. Defaults to 2.
 * `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s". Defaults to no delay.
@@ -159,7 +159,7 @@ There are three types of validators:
 
 * `ignore`: This type of validator makes sure that `mdox` does not check links with provided regex. This is the most common use case.
 * `githubPullsIssues`: This is a smart validator which only accepts a specific type of regex of the form `(^http[s]?:\/\/)(www\.)?(github\.com\/){ORG}\/{REPO}(\/pull\/|\/issues\/)`. It performs smart validation on GitHub PR and issues links, by fetching GitHub API to get the latest pull/issue number and matching regex. This makes sure that mdox doesn't get rate limited by GitHub, even when checking a large number of GitHub links(which is pretty common in documentation)!
-* `roundtrip`: All links are checked with the roundtrip validator by default(no need for including into config explicitly) which means that each link is visited and fails if http status code is not 200(even after retries).
+* `roundtrip`: All links are checked with the roundtrip validator by default(no need for including into config explicitly). Transport errors and HTTP 429, 500, 502, 503, and 504 responses are retried up to three times, with backoff delays of 2, 4, and 8 seconds. A valid `Retry-After` header (seconds or an HTTP date) can extend the delay up to one minute. Longer requested delays are reported as errors without retrying. Redirects are followed by the HTTP client. Links that still fail after retries are reported as errors. Rate limiting does not count as successful validation.
 
 Relative link checking *is not* affected by this configuration, as it is expected that such links will work.
 

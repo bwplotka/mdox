@@ -4,3 +4,7 @@ validators:
   # Validators to skip checking PR/issue links of mdox.
   - regex: '(^http[s]?:\/\/)(www\.)?(github\.com\/)bwplotka\/mdox(\/pull\/|\/issues\/)'
     type: 'githubPullsIssues'
+
+  # Skip the Slack channel link to avoid requests that require authentication.
+  - regex: '^https://cloud-native\.slack\.com/archives/mdox$'
+    type: 'ignore'
