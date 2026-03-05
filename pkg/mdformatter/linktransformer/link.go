@@ -99,6 +99,11 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 const (
 	originalURLKey     = "originalURLKey"
 	numberOfRetriesKey = "retryKey"
+
+	maxRetries            = 3
+	defaultRequestTimeout = 30 * time.Second
+	defaultParallelism    = 25
+	defaultRandomDelay    = 500 * time.Millisecond
 )
 
 type chain struct {
@@ -218,14 +223,14 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	linktransformerMetrics := newLinktransformerMetrics(reg)
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:     true,
+		ForceAttemptHTTP2:     false,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
+		ResponseHeaderTimeout: defaultRequestTimeout,
 		ExpectContinueTimeout: 5 * time.Second,
 		DialContext: (&net.Dialer{
-			Timeout:   100 * time.Second,
+			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 	}
@@ -238,7 +243,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx), colly.UserAgent("Mozilla/5.0 (compatible; mdox/link-checker; +https://github.com/bwplotka/mdox)")),
 		storage:        nil,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
@@ -257,11 +262,11 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		},
 	}
 
-	// Set very soft limits.
-	// E.g GitHub has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
-	// on API (only search is below 100).
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
+		transport.ResponseHeaderTimeout = config.timeout
+	} else {
+		v.c.SetRequestTimeout(defaultRequestTimeout)
 	}
 
 	if v.validateConfig.Cache.IsSet() && storage != nil {
@@ -273,7 +278,8 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 
 	limitRule := &colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 100,
+		Parallelism: defaultParallelism,
+		RandomDelay: defaultRandomDelay,
 	}
 	if config.Parallelism > 0 {
 		limitRule.Parallelism = config.Parallelism
@@ -300,51 +306,62 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = nil
 	})
 	v.c.OnError(func(response *colly.Response, err error) {
-		v.rMu.Lock()
-		defer v.rMu.Unlock()
-		retriesStr := response.Ctx.Get(numberOfRetriesKey)
-		retries, _ := strconv.Atoi(retriesStr)
-		switch response.StatusCode {
-		case http.StatusTooManyRequests:
-			if retries > 0 {
-				break
-			}
-			var retryAfterSeconds int
-			// Retry calls same methods as Visit and makes request with same options.
-			// So retryKey is incremented here if onError is called again after Retry. By default retries once.
-			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
-			retryAfterSeconds, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
-			if convErr != nil {
-				retryAfterSeconds = 1
-			}
-			select {
-			case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
-			case <-v.c.Context.Done():
-				return
-			}
-
-			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
-				break
-			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q rate limited even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
-		// 0 StatusCode means error on call side.
-		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable, 0:
-			if retries > 0 {
-				break
-			}
-			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
-
-			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
-				break
-			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
-		default:
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
+		shouldRetry, backoff := v.recordError(response, err)
+		if !shouldRetry {
+			return
 		}
+
+		timer := time.NewTimer(backoff)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-v.c.Context.Done():
+			v.rMu.Lock()
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf(
+				"%q not accessible; status code %v; cancelled during backoff: %w",
+				response.Request.URL.String(), response.StatusCode, err)
+			v.rMu.Unlock()
+			return
+		}
+
+		// In async mode Retry always returns nil (fires a new goroutine);
+		// the retry result arrives via a later OnScraped or OnError callback.
+		response.Request.Retry()
 	})
 	return v, nil
+}
+
+// recordError evaluates a failed request and decides whether to retry.
+// It returns (true, backoff) when a retry is warranted.
+// Map writes happen under rMu so the caller can sleep without holding the lock.
+func (v *validator) recordError(response *colly.Response, err error) (shouldRetry bool, backoff time.Duration) {
+	v.rMu.Lock()
+	defer v.rMu.Unlock()
+
+	originalURL := response.Ctx.Get(originalURLKey)
+	retries, _ := strconv.Atoi(response.Ctx.Get(numberOfRetriesKey))
+
+	switch response.StatusCode {
+	case http.StatusTooManyRequests:
+		// A 429 proves the server is alive and the URL is routable.
+		// Retrying would only add load; treat as valid instead.
+		level.Debug(v.logger).Log("msg", "rate limited, treating as valid", "url", originalURL, "status", response.StatusCode)
+		v.remoteLinks[originalURL] = nil
+		return false, 0
+
+	case http.StatusServiceUnavailable, 0:
+		if retries < maxRetries {
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+			v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v; retrying: %w", response.Request.URL.String(), response.StatusCode, err)
+			return true, time.Duration(1<<uint(retries+1)) * time.Second
+		}
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v after %d retries: %w", response.Request.URL.String(), response.StatusCode, retries, err)
+
+	default:
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
+	}
+
+	return false, 0
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
