@@ -150,20 +150,35 @@ validators:
 
 As seen above, mdox supports validate configuration supports a few parameters and passing an array of link validators with types and regexes. The supported configuration parameters are:
 
-* `timeout`: The HTTP client's timeout. Defaults to "10s".
-* `parallelism`: The maximum amount of concurrent HTTP requests. Defaults to 100.
+* `timeout`: The HTTP client's timeout. Defaults to "30s".
+* `parallelism`: The maximum amount of concurrent HTTP requests. Defaults to 25.
 * `host_max_conns`: The maximum amount of HTTP connections open per host. Defaults to 2.
-* `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s". Defaults to no delay.
+* `random_delay`: A random delay between 0 and this value is added between requests. It takes values like "500ms", "1s", "1m", or "1m30s". Defaults to "500ms".
 
 There are three types of validators:
 
 * `ignore`: This type of validator makes sure that `mdox` does not check links with provided regex. This is the most common use case.
 * `githubPullsIssues`: This is a smart validator which only accepts a specific type of regex of the form `(^http[s]?:\/\/)(www\.)?(github\.com\/){ORG}\/{REPO}(\/pull\/|\/issues\/)`. It performs smart validation on GitHub PR and issues links, by fetching GitHub API to get the latest pull/issue number and matching regex. This makes sure that mdox doesn't get rate limited by GitHub, even when checking a large number of GitHub links(which is pretty common in documentation)!
-* `roundtrip`: All links are checked with the roundtrip validator by default(no need for including into config explicitly) which means that each link is visited and fails if http status code is not 200(even after retries).
+* `roundtrip`: All links are checked with the roundtrip validator by default(no need for including into config explicitly) which means that each link is visited and fails if http status code is not 200(even after retries). HTTP 429 (Too Many Requests) is treated as a valid response since it proves the server is alive.
 
 Relative link checking *is not* affected by this configuration, as it is expected that such links will work.
 
 YAML can be passed in directly as well using `links.validate.config` flag! For more details [go.dev reference](https://pkg.go.dev/github.com/bwplotka/mdox) or [Go struct](https://github.com/bwplotka/mdox/blob/main/pkg/mdformatter/linktransformer/config.go).
+
+#### Recommended CI configuration
+
+For CI environments, enabling caching avoids re-checking links that were recently verified. This is the most effective way to reduce flaky CI failures:
+
+```yaml
+version: 1
+timeout: '1m'
+parallelism: 25
+host_max_conns: 10
+random_delay: '1s'
+cache:
+  type: 'SQLite'
+  jitter: '24h'
+```
 
 ### Link localization
 

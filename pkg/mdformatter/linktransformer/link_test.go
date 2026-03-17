@@ -7,11 +7,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/bwplotka/mdox/pkg/mdformatter"
@@ -360,7 +364,7 @@ validators:
 			MustNewValidator(logger, []byte(""), anchorDir, nil),
 		))
 		testutil.NotOk(t, err)
-		testutil.Assert(t, strings.Contains(err.Error(), fmt.Sprintf("%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible even after retry; status code 0", relDirPath+filePath)))
+		testutil.Assert(t, strings.Contains(err.Error(), fmt.Sprintf("%v:1: \"https://docs.gfoogle.com/drawings/d/e/2PACX-1vTBFK_cGMbxFpYcv/pub?w=960&h=720\" not accessible; status code 0 after %d retries", relDirPath+filePath, maxRetries)))
 		testutil.Assert(t, strings.Contains(err.Error(), fmt.Sprintf("%v:1: \"https://bwplotka.dev/does-not-exists\" not accessible; status code 404: Not Found", relDirPath+filePath)))
 	})
 
@@ -532,5 +536,97 @@ validators:
 		testutil.NotOk(t, err)
 
 		testutil.Equals(t, "sql: no rows in result set", err.Error())
+	})
+}
+
+func TestValidator_RetryBehavior(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-retry")
+	testutil.Ok(t, err)
+	t.Cleanup(func() { testutil.Ok(t, os.RemoveAll(tmpDir)) })
+
+	logger := log.NewLogfmtLogger(os.Stderr)
+	anchorDir := tmpDir
+
+	t.Run("429 treated as valid", func(t *testing.T) {
+		var requestCount int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt32(&requestCount, 1)
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+		}))
+		defer srv.Close()
+
+		testFile := filepath.Join(tmpDir, "valid-429.md")
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[link]("+srv.URL+")\n"), os.ModePerm))
+
+		_, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, nil),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, int32(1), atomic.LoadInt32(&requestCount))
+	})
+
+	t.Run("503 recovers on retry", func(t *testing.T) {
+		var requestCount int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			count := atomic.AddInt32(&requestCount, 1)
+			if count <= 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+
+		testFile := filepath.Join(tmpDir, "retry-503.md")
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[link]("+srv.URL+")\n"), os.ModePerm))
+
+		_, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, nil),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, int32(2), atomic.LoadInt32(&requestCount))
+	})
+
+	t.Run("301 is not retried", func(t *testing.T) {
+		var requestCount int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt32(&requestCount, 1)
+			w.WriteHeader(http.StatusMovedPermanently)
+		}))
+		defer srv.Close()
+
+		testFile := filepath.Join(tmpDir, "no-retry-301.md")
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[link]("+srv.URL+")\n"), os.ModePerm))
+
+		_, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, nil),
+		))
+		testutil.NotOk(t, err)
+		testutil.Assert(t, strings.Contains(err.Error(), "not accessible"))
+		testutil.Assert(t, !strings.Contains(err.Error(), "retries"))
+	})
+
+	t.Run("context cancellation stops retries", func(t *testing.T) {
+		var requestCount int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt32(&requestCount, 1)
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+		defer srv.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		testFile := filepath.Join(tmpDir, "cancel-retry.md")
+		testutil.Ok(t, os.WriteFile(testFile, []byte("[link]("+srv.URL+")\n"), os.ModePerm))
+
+		v, vErr := NewValidator(ctx, logger, []byte(""), anchorDir, nil, nil)
+		testutil.Ok(t, vErr)
+
+		_, err := mdformatter.IsFormatted(ctx, logger, []string{testFile}, mdformatter.WithLinkTransformer(v))
+		testutil.NotOk(t, err)
+		testutil.Assert(t, strings.Contains(err.Error(), "cancelled during backoff") || strings.Contains(err.Error(), "not accessible"),
+			fmt.Sprintf("unexpected error: %v", err))
 	})
 }
