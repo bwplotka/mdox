@@ -21,7 +21,7 @@ Allow projects to have self-updating up-to-date documentation available in both 
   * "Localizing" links to relative docs if specified (useful for multi-domain websites or multi-version doc). (see [#link-localization](#link-localization))
     * This allows smooth integration with static document websites like [Docusaurus](https://docusaurus.io/) or [hugo](https://gohugo.io) based themes!
   * Flexible pre-processing allowing easy to use GitHub experience as well as website. (see [#transform-usage](#transformation))
-* Allows profiling(using [fgprof](https://github.com/felixge/fgprof)) and exports metrics(saves to file in [OpenMetrics](https://openmetrics.io/) format) for easy debugging
+* Allows profiling(using [fgprof](https://github.com/felixge/fgprof)) and exports metrics(saves to file in [OpenMetrics](https://prometheus.io/docs/specs/om/open_metrics_spec/) format) for easy debugging
 
 ## Usage
 
