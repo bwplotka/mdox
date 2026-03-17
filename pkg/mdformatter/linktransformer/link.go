@@ -527,11 +527,11 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 
 	// File present, cache presence.
 	ids := make([]string, 0)
-
-	var b []byte
+	idDup := map[string]struct{}{}
 	reader := bufio.NewReader(file)
+
 	for {
-		b, err = reader.ReadBytes('\n')
+		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				return fmt.Errorf("failed to read file %v: %w", localLink, err)
@@ -539,8 +539,26 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 			break
 		}
 
-		if bytes.HasPrefix(b, []byte(`#`)) {
-			ids = append(ids, toHeaderID(b))
+		if !bytes.HasPrefix(line, []byte("#")) {
+			if err == io.EOF {
+				break
+			}
+			continue
+		}
+
+		headerID := toHeaderID(line)
+		uniqueID := headerID
+		for i := 1; ; i++ {
+			if _, exists := idDup[uniqueID]; !exists {
+				break
+			}
+			uniqueID = fmt.Sprintf("%s-%d", headerID, i)
+		}
+		idDup[uniqueID] = struct{}{}
+		ids = append(ids, uniqueID)
+
+		if err == io.EOF {
+			break
 		}
 	}
 
@@ -548,29 +566,24 @@ func (l localLinksCache) addRelLinks(localLink string) error {
 	return nil
 }
 
-func toHeaderID(header []byte) string {
-	var id []byte
-	// Remove punctuation from header except '-' or '#'.
-	// '\p{L}\p{N}\p{M}' is the Unicode equivalent of '\w', https://www.regular-expressions.info/unicode.html.
-	punctuation := regexp.MustCompile(`[^\p{L}\p{N}\p{M}-# ]`)
-	header = punctuation.ReplaceAll(header, []byte(""))
-	headerText := bytes.TrimLeft(bytes.ToLower(header), "#")
-	// If header is just punctuation it comes up empty, so it cannot be linked.
-	if len(headerText) <= 1 {
-		return ""
-	}
+var punctuationRe = regexp.MustCompile(`[^\p{L}\p{N}\p{M}-# ]`)
 
-	for _, h := range headerText[1:] {
-		switch h {
+func toHeaderID(header []byte) string {
+	clean := punctuationRe.ReplaceAll(header, nil)
+	text := bytes.TrimLeft(bytes.ToLower(clean), "# ")
+
+	var id []byte
+	for _, r := range string(text) {
+		switch r {
 		case '{':
 			return string(id)
-		case ' ', '-':
+		case ' ', '-', '\n', '\r':
 			id = append(id, '-')
 		default:
-			id = append(id, h)
+			id = append(id, string(r)...)
 		}
 	}
-	return string(id)
+	return strings.Trim(string(id), "-")
 }
 
 func absLocalLink(anchorDir string, docPath string, destination string) string {
