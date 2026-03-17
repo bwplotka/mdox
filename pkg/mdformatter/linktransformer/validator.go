@@ -5,12 +5,61 @@ package linktransformer
 
 import (
 	"fmt"
+	"net"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
 type Validator interface {
 	IsValid(k futureKey, r *validator) (bool, error)
+}
+
+func (v LocalValidator) IsValid(k futureKey, r *validator) (bool, error) {
+	r.l.localLinksChecked.Inc()
+	// Check if link is email address.
+	if email := strings.TrimPrefix(k.dest, "mailto:"); email != k.dest {
+		if isValidEmail(email) {
+			return true, nil
+		}
+		r.destFutures[k].resultFn = func() error { return fmt.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
+		return false, nil
+	}
+
+	anchorDir := r.anchorDir
+	if v.anchor != "" {
+		anchorDir = filepath.Join(anchorDir, v.anchor)
+	}
+	// Relative or absolute path. Check if exists.
+	newDest := absLocalLink(anchorDir, k.filepath, k.dest)
+
+	// Local link. Check if exists.
+	if err := r.localLinks.Lookup(newDest); err != nil {
+		r.destFutures[k].resultFn = func() error { return fmt.Errorf("link %v, normalized to: %w", k.dest, err) }
+		return false, nil
+	}
+	return true, nil
+}
+
+// isValidEmail checks email structure and domain.
+func isValidEmail(email string) bool {
+	// Check length.
+	if len(email) < 3 && len(email) > 254 {
+		return false
+	}
+	// Regex from https://www.w3.org/TR/2016/REC-html51-20161101/sec-forms.html#email-state-typeemail.
+	var emailRe = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	if !emailRe.MatchString(email) {
+		return false
+	}
+	// Check email domain.
+	domain := strings.Split(email, "@")
+	mx, err := net.LookupMX(domain[1])
+	if err != nil || len(mx) == 0 {
+		return false
+	}
+	return true
 }
 
 // GitHubPullsIssuesValidator.IsValid skips visiting all GitHub issue/PR links.
@@ -36,7 +85,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	matches := remoteLinkPrefixRe.FindAllStringIndex(k.dest, 1)
 	if matches == nil && r.validateConfig.ExplicitLocalValidators {
 		r.l.localLinksChecked.Inc()
-		return r.checkLocal(k), nil
+		return LocalValidator{}.IsValid(k, r)
 	}
 
 	// Result will be in future.
@@ -72,7 +121,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	return true, nil
 }
 
-// IgnoreValidator.IsValid returns true if matched so that link in not checked.
+// IsValid returns true if matched so that link in not checked.
 func (v IgnoreValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.l.ignoreSkippedLinks.Inc()
 
@@ -98,6 +147,11 @@ func (v Config) GetValidatorForURL(URL string) Validator {
 				continue
 			}
 			return val.igValidator
+		case localValidator:
+			if !val.lValidator._regex.MatchString(URL) {
+				continue
+			}
+			return val.lValidator
 		default:
 			panic("unexpected validator type")
 		}
