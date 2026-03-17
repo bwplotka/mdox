@@ -398,28 +398,6 @@ func (v *validator) Close(ctx mdformatter.SourceContext) error {
 	return merr.Err()
 }
 
-func (v *validator) checkLocal(k futureKey) bool {
-	v.l.localLinksChecked.Inc()
-	// Check if link is email address.
-	if email := strings.TrimPrefix(k.dest, "mailto:"); email != k.dest {
-		if isValidEmail(email) {
-			return true
-		}
-		v.destFutures[k].resultFn = func() error { return fmt.Errorf("provided mailto link is not a valid email, got %v", k.dest) }
-		return false
-	}
-
-	// Relative or absolute path. Check if exists.
-	newDest := absLocalLink(v.anchorDir, k.filepath, k.dest)
-
-	// Local link. Check if exists.
-	if err := v.localLinks.Lookup(newDest); err != nil {
-		v.destFutures[k].resultFn = func() error { return fmt.Errorf("link %v, normalized to: %w", k.dest, err) }
-		return false
-	}
-	return true
-}
-
 func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	v.futureMu.Lock()
 	defer v.futureMu.Unlock()
@@ -432,39 +410,19 @@ func (v *validator) visit(filepath string, dest string, lineNumbers string) {
 	if !v.validateConfig.ExplicitLocalValidators {
 		matches := remoteLinkPrefixRe.FindAllStringIndex(dest, 1)
 		if matches == nil {
-			v.checkLocal(k)
+			_, _ = LocalValidator{}.IsValid(k, v)
 			return
 		}
 		v.l.remoteLinksChecked.Inc()
 	}
 
+	// TODO: Capture error?
 	validator := v.validateConfig.GetValidatorForURL(dest)
 	if validator != nil {
-		matched, err := validator.IsValid(k, v)
-		if matched && err == nil {
-			return
-		}
+		_, _ = validator.IsValid(k, v)
+		return
 	}
-}
 
-// isValidEmail checks email structure and domain.
-func isValidEmail(email string) bool {
-	// Check length.
-	if len(email) < 3 && len(email) > 254 {
-		return false
-	}
-	// Regex from https://www.w3.org/TR/2016/REC-html51-20161101/sec-forms.html#email-state-typeemail.
-	var emailRe = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
-	if !emailRe.MatchString(email) {
-		return false
-	}
-	// Check email domain.
-	domain := strings.Split(email, "@")
-	mx, err := net.LookupMX(domain[1])
-	if err != nil || len(mx) == 0 {
-		return false
-	}
-	return true
 }
 
 type localLinksCache map[string]*[]string

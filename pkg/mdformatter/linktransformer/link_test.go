@@ -167,10 +167,39 @@ func TestValidator_TransformDestination(t *testing.T) {
 	})
 
 	t.Run("check valid local links", func(t *testing.T) {
+		for _, viaLocalValidator := range []bool{false, true} {
+			t.Run("viaLocal="+fmt.Sprint(viaLocalValidator), func(t *testing.T) {
+				testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links.md")
+				testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
+
+[1](.) [2](#yolo) [3](../test/valid-local-links.md) [4](../test/valid-local-links.md#yolo) [5](../a/doc.md)
+`), os.ModePerm))
+
+				diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+				testutil.Ok(t, err)
+				testutil.Equals(t, 0, len(diff), diff.String())
+
+				lt := MustNewValidator(logger, []byte(""), anchorDir, nil)
+				if viaLocalValidator {
+					lt = MustNewValidator(logger, []byte(`
+version: 1
+explicitLocalValidators: true
+validators:
+- type: local
+  regex: '^.*$'
+`), anchorDir, nil)
+				}
+				diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(lt))
+				testutil.Ok(t, err)
+				testutil.Equals(t, 0, len(diff), diff.String())
+			})
+		}
+	})
+	t.Run("check valid local links with anchor and ignore", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links.md")
 		testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
 
-[1](.) [2](#yolo) [3](../test/valid-local-links.md) [4](../test/valid-local-links.md#yolo) [5](../a/doc.md)
+[1](.) [2](#yolo) [3](../test/valid-local-links.md) [4](../test/valid-local-links.md#yolo) [5](/doc.md) [6](../a/does-not-exists-on-purpose.md)
 `), os.ModePerm))
 
 		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
@@ -178,12 +207,22 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Equals(t, 0, len(diff), diff.String())
 
 		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
+			MustNewValidator(logger, []byte(`
+version: 1
+explicitLocalValidators: true
+validators:
+- type: ignore
+  regex: '^../a/does-not-exists-on-purpose.md$'
+- type: local
+  regex: '^/doc.md$'
+  anchor: "a"
+- type: local
+  regex: '^.*$'
+`), anchorDir, nil),
 		))
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 	})
-
 	t.Run("check valid local links with dash", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-local-links-with-dash.md")
 		testutil.Ok(t, os.WriteFile(testFile, []byte(`# Expose UI on a sub-path
@@ -229,32 +268,44 @@ func TestValidator_TransformDestination(t *testing.T) {
 	})
 
 	t.Run("check invalid local links", func(t *testing.T) {
-		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
-		filePath := "/repo/docs/test/invalid-local-links.md"
-		wdir, err := os.Getwd()
-		testutil.Ok(t, err)
-		relDirPath, err := filepath.Rel(wdir, tmpDir)
-		testutil.Ok(t, err)
-		testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
+		for _, viaLocalValidator := range []bool{false, true} {
+			t.Run("viaLocal="+fmt.Sprint(viaLocalValidator), func(t *testing.T) {
+				testFile := filepath.Join(tmpDir, "repo", "docs", "test", "invalid-local-links.md")
+				filePath := "/repo/docs/test/invalid-local-links.md"
+				wdir, err := os.Getwd()
+				testutil.Ok(t, err)
+				relDirPath, err := filepath.Rel(wdir, tmpDir)
+				testutil.Ok(t, err)
+				testutil.Ok(t, os.WriteFile(testFile, []byte(`# yolo
 
 [1](.) [2](#not-yolo) [3](../test2/invalid-local-links.md) [4](../test/invalid-local-links.md#not-yolo) [5](../test/doc.md)
 `), os.ModePerm))
 
-		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
-		testutil.Ok(t, err)
-		testutil.Equals(t, 0, len(diff), diff.String())
+				diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+				testutil.Ok(t, err)
+				testutil.Equals(t, 0, len(diff), diff.String())
 
-		_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
-			MustNewValidator(logger, []byte(""), anchorDir, nil),
-		))
-		testutil.NotOk(t, err)
+				lt := MustNewValidator(logger, []byte(""), anchorDir, nil)
+				if viaLocalValidator {
+					lt = MustNewValidator(logger, []byte(`
+version: 1
+explicitLocalValidators: true
+validators:
+- type: local
+  regex: '^.*$'
+`), anchorDir, nil)
+				}
+				_, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(lt))
+				testutil.NotOk(t, err)
 
-		testutil.Equals(t, fmt.Sprintf("%v: 4 errors: "+
-			"%v:3: link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
-			"%v:3: link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
-			"%v:3: link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
-			"%v:3: link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
-			tmpDir+filePath, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir), err.Error())
+				testutil.Equals(t, fmt.Sprintf("%v: 4 errors: "+
+					"%v:3: link ../test2/invalid-local-links.md, normalized to: %v/repo/docs/test2/invalid-local-links.md: file not found; "+
+					"%v:3: link ../test/invalid-local-links.md#not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id; "+
+					"%v:3: link ../test/doc.md, normalized to: %v/repo/docs/test/doc.md: file not found; "+
+					"%v:3: link #not-yolo, normalized to: link %v/repo/docs/test/invalid-local-links.md#not-yolo, existing ids: [yolo]: file exists, but does not have such id",
+					tmpDir+filePath, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir, relDirPath+filePath, tmpDir), err.Error())
+			})
+		}
 	})
 
 	t.Run("check valid email link", func(t *testing.T) {

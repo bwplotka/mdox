@@ -22,6 +22,9 @@ type Config struct {
 
 	Cache cache.Config `yaml:"cache"`
 
+	// ExplicitLocalValidators forces all links (remote and local) to go through validators.
+	// If false (default), only http(s) links go to validators.
+	// Use it for additional the validation options on local links.
 	ExplicitLocalValidators bool              `yaml:"explicitLocalValidators"`
 	Validators              []ValidatorConfig `yaml:"validators"`
 	Timeout                 string            `yaml:"timeout"`
@@ -38,14 +41,17 @@ type Config struct {
 type ValidatorConfig struct {
 	// Regex for type of validator. For `githubPullsIssues` this is: (^http[s]?:\/\/)(www\.)?(github\.com\/){ORG_NAME}\/{REPO_NAME}(\/pull\/|\/issues\/).
 	Regex string `yaml:"regex"`
-	// By default type is `roundtrip`. Could be `githubPullsIssues` or `ignore`.
+	// By default type is `roundtrip`. Could be `githubPullsIssues`, `ignore`, or `local`.
 	Type ValidatorType `yaml:"type"`
 	// GitHub repo token to avoid getting rate limited.
 	Token string `yaml:"token"`
+	// Anchor for additional path to add before the local link check.
+	Anchor string `yaml:"anchor"`
 
 	ghValidator GitHubPullsIssuesValidator
 	rtValidator RoundTripValidator
 	igValidator IgnoreValidator
+	lValidator  LocalValidator
 }
 
 type RoundTripValidator struct {
@@ -61,12 +67,17 @@ type IgnoreValidator struct {
 	_regex *regexp.Regexp
 }
 
+type LocalValidator struct {
+	_regex *regexp.Regexp
+	anchor string
+}
 type ValidatorType string
 
 const (
 	roundtripValidator         ValidatorType = "roundtrip"
 	githubPullsIssuesValidator ValidatorType = "githubPullsIssues"
 	ignoreValidator            ValidatorType = "ignore"
+	localValidator             ValidatorType = "local"
 )
 
 const (
@@ -124,8 +135,12 @@ func ParseConfig(c []byte) (Config, error) {
 			cfg.Validators[i].ghValidator._maxNum = maxNum
 		case ignoreValidator:
 			cfg.Validators[i].igValidator._regex = regexp.MustCompile(cfg.Validators[i].Regex)
+		case localValidator:
+			cfg.Validators[i].lValidator._regex = regexp.MustCompile(cfg.Validators[i].Regex)
+			cfg.Validators[i].lValidator.anchor = cfg.Validators[i].Anchor
+
 		default:
-			return Config{}, errors.New("Validator type not supported")
+			return Config{}, fmt.Errorf("validator type %v not supported", cfg.Validators[i].Type)
 		}
 	}
 	return cfg, nil
