@@ -13,10 +13,12 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 ### Added
 
 * [#86](https://github.com/bwplotka/mdox/pull/86) Add configuration options for sending HTTP requests (to help avoid intermittent errors).
+* [#180](https://github.com/bwplotka/mdox/pull/180) Allow ignoring/re-anchoring local links via localValidator.
 
 ### Fixed
 
 * [#84](https://github.com/bwplotka/mdox/pull/84) Allow quotes in first header.
+* [#181](https://github.com/bwplotka/mdox/pull/181) Add support for repeated markdown headers.
 
 ## [v0.9.0](https://github.com/bwplotka/mdox/releases/tag/v0.9.0)
 

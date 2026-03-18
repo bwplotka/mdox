@@ -148,6 +148,27 @@ func TestValidator_TransformDestination(t *testing.T) {
 		testutil.Ok(t, err)
 		testutil.Equals(t, 0, len(diff), diff.String())
 	})
+	t.Run("check valid link; repeated headers", func(t *testing.T) {
+		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
+		testutil.Ok(t, os.WriteFile(testFile, []byte(`# Yolo
+
+# Yolo
+
+# Yolo
+
+I should link to [1](#yolo-2) and [2](#yolo-1). Also [3](#yolo).
+`), os.ModePerm))
+
+		diff, err := mdformatter.IsFormatted(context.TODO(), logger, []string{testFile})
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+
+		diff, err = mdformatter.IsFormatted(context.TODO(), logger, []string{testFile}, mdformatter.WithLinkTransformer(
+			MustNewValidator(logger, []byte(""), anchorDir, nil),
+		))
+		testutil.Ok(t, err)
+		testutil.Equals(t, 0, len(diff), diff.String())
+	})
 
 	t.Run("check valid but same link in diff files", func(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "repo", "docs", "test", "valid-link.md")
