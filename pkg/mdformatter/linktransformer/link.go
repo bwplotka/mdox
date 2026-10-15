@@ -12,7 +12,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -99,6 +98,9 @@ func newLinktransformerMetrics(reg *prometheus.Registry) *linktransformerMetrics
 const (
 	originalURLKey     = "originalURLKey"
 	numberOfRetriesKey = "retryKey"
+
+	maxRetries    = 3
+	maxRetryDelay = time.Minute
 )
 
 type chain struct {
@@ -189,8 +191,7 @@ type validator struct {
 	futureMu    sync.Mutex
 	destFutures map[futureKey]*futureResult
 
-	l           *linktransformerMetrics
-	transportFn func(url string) http.RoundTripper
+	l *linktransformerMetrics
 }
 
 type futureKey struct {
@@ -203,19 +204,7 @@ type futureResult struct {
 	cases    int
 }
 
-// NewValidator returns mdformatter.LinkTransformer that crawls all links.
-// TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
-func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
-	var err error
-	config := Config{}
-	if string(linksValidateConfig) != "" {
-		config, err = ParseConfig(linksValidateConfig)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	linktransformerMetrics := newLinktransformerMetrics(reg)
+func newHTTPTransport(config Config) *http.Transport {
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
@@ -232,6 +221,26 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	if config.HostMaxConns != nil {
 		transport.MaxConnsPerHost = *config.HostMaxConns
 	}
+	if config.Timeout != "" {
+		transport.ResponseHeaderTimeout = config.timeout
+	}
+	return transport
+}
+
+// NewValidator returns mdformatter.LinkTransformer that crawls all links.
+// TODO(bwplotka): Add optimization and debug modes - this is the main source of latency and pain.
+func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []byte, anchorDir string, storage *cache.SQLite3Storage, reg *prometheus.Registry) (mdformatter.LinkTransformer, error) {
+	var err error
+	config := Config{}
+	if string(linksValidateConfig) != "" {
+		config, err = ParseConfig(linksValidateConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	linktransformerMetrics := newLinktransformerMetrics(reg)
+	transport := newHTTPTransport(config)
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
@@ -242,27 +251,25 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		storage:        nil,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
-		transportFn: func(u string) http.RoundTripper {
-			parsed, err := url.Parse(u)
-			if err != nil {
-				panic(err)
-			}
-			return promhttp.InstrumentRoundTripperCounter(
-				linktransformerMetrics.collyRequests,
-				promhttp.InstrumentRoundTripperDuration(
-					linktransformerMetrics.collyPerDomainLatency.MustCurryWith(prometheus.Labels{"domain": parsed.Host}),
-					transport,
-				),
-			)
-		},
 	}
 
-	// Set very soft limits.
-	// E.g GitHub has 50-5000 https://docs.github.com/en/free-pro-team@latest/rest/reference/rate-limit limit depending
-	// on API (only search is below 100).
 	if config.Timeout != "" {
 		v.c.SetRequestTimeout(config.timeout)
 	}
+	// Install the transport once to avoid races between async requests.
+	v.c.WithTransport(promhttp.InstrumentRoundTripperCounter(
+		linktransformerMetrics.collyRequests,
+		// Observe duration directly instead of using promhttp.InstrumentRoundTripperDuration
+		// because the domain label depends on each request's URL host.
+		promhttp.RoundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			start := time.Now()
+			resp, err := transport.RoundTrip(r)
+			if err == nil {
+				linktransformerMetrics.collyPerDomainLatency.WithLabelValues(r.URL.Host).Observe(time.Since(start).Seconds())
+			}
+			return resp, err
+		}),
+	))
 
 	if v.validateConfig.Cache.IsSet() && storage != nil {
 		v.storage = storage
@@ -300,51 +307,94 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 		v.remoteLinks[response.Ctx.Get(originalURLKey)] = nil
 	})
 	v.c.OnError(func(response *colly.Response, err error) {
-		v.rMu.Lock()
-		defer v.rMu.Unlock()
-		retriesStr := response.Ctx.Get(numberOfRetriesKey)
-		retries, _ := strconv.Atoi(retriesStr)
-		switch response.StatusCode {
-		case http.StatusTooManyRequests:
-			if retries > 0 {
-				break
-			}
-			var retryAfterSeconds int
-			// Retry calls same methods as Visit and makes request with same options.
-			// So retryKey is incremented here if onError is called again after Retry. By default retries once.
-			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
-			retryAfterSeconds, convErr := strconv.Atoi(response.Headers.Get("Retry-After"))
-			if convErr != nil {
-				retryAfterSeconds = 1
-			}
-			select {
-			case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
-			case <-v.c.Context.Done():
-				return
-			}
+		shouldRetry, backoff := v.recordError(response, err)
+		if !shouldRetry {
+			return
+		}
 
-			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
-				break
-			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q rate limited even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
-		// 0 StatusCode means error on call side.
-		case http.StatusMovedPermanently, http.StatusTemporaryRedirect, http.StatusServiceUnavailable, 0:
-			if retries > 0 {
-				break
-			}
-			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+		// Stop canceled timers explicitly for Go versions before 1.23.
+		timer := time.NewTimer(backoff)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-v.c.Context.Done():
+		}
+		if ctxErr := v.c.Context.Err(); ctxErr != nil {
+			v.rMu.Lock()
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf(
+				"%q not accessible, status code %v, canceled during backoff: %w",
+				response.Request.URL.String(), response.StatusCode, ctxErr)
+			v.rMu.Unlock()
+			return
+		}
 
-			if retryErr := response.Request.Retry(); retryErr != nil {
-				v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), err)
-				break
-			}
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible even after retry; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
-		default:
-			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
+		if retryErr := response.Request.Retry(); retryErr != nil {
+			v.rMu.Lock()
+			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf("remote link retry %v: %w", response.Ctx.Get(originalURLKey), retryErr)
+			v.rMu.Unlock()
 		}
 	})
 	return v, nil
+}
+
+// recordError evaluates a failed request and decides whether to retry.
+// It returns (true, backoff) when a retry is warranted.
+// Map writes happen under rMu so the caller can sleep without holding the lock.
+func (v *validator) recordError(response *colly.Response, err error) (bool, time.Duration) {
+	v.rMu.Lock()
+	defer v.rMu.Unlock()
+
+	originalURL := response.Ctx.Get(originalURLKey)
+	if ctxErr := v.c.Context.Err(); ctxErr != nil {
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v: %w", response.Request.URL.String(), response.StatusCode, ctxErr)
+		return false, 0
+	}
+	retries, _ := strconv.Atoi(response.Ctx.Get(numberOfRetriesKey))
+
+	switch response.StatusCode {
+	// Status 0 represents a transport error. HTTP redirects are followed by the client.
+	case 0, http.StatusTooManyRequests, http.StatusInternalServerError,
+		http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		if retries < maxRetries {
+			backoff := time.Duration(1<<uint(retries+1)) * time.Second
+			delay, delayErr := retryDelay(response, backoff)
+			if delayErr != nil {
+				v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v, %v: %w", response.Request.URL.String(), response.StatusCode, delayErr, err)
+				return false, 0
+			}
+			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
+			return true, delay
+		}
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v after %d retries: %w", response.Request.URL.String(), response.StatusCode, retries, err)
+
+	default:
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
+	}
+
+	return false, 0
+}
+
+// retryDelay honors Retry-After without shortening the exponential backoff.
+// Delays exceeding maxRetryDelay are rejected.
+func retryDelay(response *colly.Response, backoff time.Duration) (time.Duration, error) {
+	if response.Headers == nil {
+		return backoff, nil
+	}
+	retryAfter := response.Headers.Get("Retry-After")
+	var delay time.Duration
+	// Limit the parsed integer to avoid overflowing time.Duration when converting seconds.
+	if seconds, err := strconv.ParseUint(retryAfter, 10, 32); err == nil || errors.Is(err, strconv.ErrRange) {
+		delay = time.Duration(seconds) * time.Second
+	} else if retryAt, err := http.ParseTime(retryAfter); err == nil {
+		delay = time.Until(retryAt)
+	}
+	if delay > maxRetryDelay {
+		return 0, fmt.Errorf("Retry-After %q exceeds maximum delay %v", retryAfter, maxRetryDelay)
+	}
+	if delay > backoff {
+		return delay, nil
+	}
+	return backoff, nil
 }
 
 // MustNewValidator returns mdformatter.LinkTransformer that crawls all links.
