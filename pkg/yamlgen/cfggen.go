@@ -55,7 +55,7 @@ func checkForOmitEmptyTagOptionRec(v reflect.Value) error {
 			}
 		}
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return errors.New("nil pointers are not allowed in configuration")
 
 	case reflect.Interface:

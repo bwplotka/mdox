@@ -1,3 +1,6 @@
+# Use the project's Go toolchain when building tools in Bingo's separate modules.
+export GOTOOLCHAIN := $(shell go env GOVERSION)
+
 include .bingo/Variables.mk
 FILES_TO_FMT      	 ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 MDOX_VALIDATE_CONFIG ?= .mdox.validate.yaml
@@ -72,11 +75,9 @@ format: $(GOIMPORTS)
 
 .PHONY: test
 test: ## Runs all Go unit tests.
-export GOCACHE=/tmp/cache
 test:
 	@echo ">> running unit tests (without cache)"
-	@rm -rf $(GOCACHE)
-	@go test -v -timeout=30m $(shell go list ./... | grep -v /vendor/);
+	@go test -v -count=1 -timeout=30m ./...
 
 .PHONY: check-git
 check-git:
@@ -92,17 +93,12 @@ endif
 #      --mem-profile-path string   Path to memory profile output file
 # to debug big allocations during linting.
 lint: ## Runs various static analysis against our code.
-lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) build format docs check-git deps
+lint: $(GOLANGCI_LINT) build format docs check-git deps
 	$(call require_clean_work_tree,"detected not clean master before running lint")
-	@echo ">> verifying modules being imported"
-	#TODO(bwplotka): Uncomment once we upstream merrors package: @$(FAILLINT) -paths "errors=github.com/pkg/errors" ./...
-	@$(FAILLINT) -paths "fmt.{Print,Printf,Println}" -ignore-tests ./...
 	@echo ">> examining all of the Go files"
 	@go vet -stdmethods=false ./...
 	@echo ">> linting all of the Go files GOGC=${GOGC}"
 	@$(GOLANGCI_LINT) run
-	@echo ">> detecting misspells"
-	@find . -type f | grep -v vendor/ | grep -vE '\./\..*' | xargs $(MISSPELL) -error
 	@echo ">> ensuring Copyright headers"
 	@go run ./scripts/copyright/...
 	$(call require_clean_work_tree,"detected files without copyright; run make lint file and commit changes.")

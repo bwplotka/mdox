@@ -279,7 +279,7 @@ YAML can be passed in directly as well using `--config` flag! For more details [
 
 Requirements to build this tool:
 
-* Go 1.19+
+* Go 1.27+
 * Linux or macOS
 
 ```shell
