@@ -244,7 +244,7 @@ func writeValue(w io.Writer, value interface{}) error {
 		switch rvalue.Kind() {
 		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
 			return ErrUnsupportedValueType
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if rvalue.IsNil() {
 				return writeBytesValue(w, null)
 			}
@@ -272,7 +272,7 @@ func writeBytesValue(w io.Writer, value []byte) error {
 func safeError(err error) (s string, ok bool) {
 	defer func() {
 		if panicVal := recover(); panicVal != nil {
-			if v := reflect.ValueOf(err); v.Kind() == reflect.Ptr && v.IsNil() {
+			if v := reflect.ValueOf(err); v.Kind() == reflect.Pointer && v.IsNil() {
 				s, ok = "null", false
 			} else {
 				s, ok = fmt.Sprintf("PANIC:%v", panicVal), false
@@ -286,7 +286,7 @@ func safeError(err error) (s string, ok bool) {
 func safeString(str fmt.Stringer) (s string, ok bool) {
 	defer func() {
 		if panicVal := recover(); panicVal != nil {
-			if v := reflect.ValueOf(str); v.Kind() == reflect.Ptr && v.IsNil() {
+			if v := reflect.ValueOf(str); v.Kind() == reflect.Pointer && v.IsNil() {
 				s, ok = "null", false
 			} else {
 				s, ok = fmt.Sprintf("PANIC:%v", panicVal), true
@@ -300,7 +300,7 @@ func safeString(str fmt.Stringer) (s string, ok bool) {
 func safeMarshal(tm encoding.TextMarshaler) (b []byte, err error) {
 	defer func() {
 		if panicVal := recover(); panicVal != nil {
-			if v := reflect.ValueOf(tm); v.Kind() == reflect.Ptr && v.IsNil() {
+			if v := reflect.ValueOf(tm); v.Kind() == reflect.Pointer && v.IsNil() {
 				b, err = nil, nil
 			} else {
 				b, err = nil, fmt.Errorf("panic when marshaling: %s", panicVal)

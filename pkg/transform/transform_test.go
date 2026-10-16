@@ -12,6 +12,8 @@ import (
 )
 
 func TestNewTargetRelPath(t *testing.T) {
+	const testFile = "testdata/file.md"
+
 	for _, tcase := range []struct {
 		glob    string
 		relPath string
@@ -21,47 +23,47 @@ func TestNewTargetRelPath(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "",
-			expected: "testdata/file.md",
+			expected: testFile,
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "yolo.ext",
 			expected: "testdata/yolo.ext",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "/yolo.ext",
 			expected: "yolo.ext",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "/*",
 			expected: "file.md",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "/boom/*",
 			expected: "boom/file.md",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "boom/*",
 			expected: "testdata/boom/file.md",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "/boom/**",
 			expected: "boom/testdata/file.md",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:        "boom/**",
 			expectedErr: errors.New("path has to be absolute if suffix /** is used, got boom/**"),
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/file.md",
+			relPath: testFile, glob: testFile,
 			path:     "/../1static/**",
 			expected: "../1static/testdata/file.md",
 		},
@@ -71,7 +73,7 @@ func TestNewTargetRelPath(t *testing.T) {
 			expected: "favicons/logo4.png",
 		},
 		{
-			relPath: "testdata/file.md", glob: "testdata/**",
+			relPath: testFile, glob: "testdata/**",
 			path:     "yolo/*",
 			expected: "yolo/file.md",
 		},

@@ -1,6 +1,6 @@
 module github.com/bwplotka/mdox
 
-go 1.19
+go 1.27.0
 
 require (
 	github.com/Kunde21/markdownfmt/v3 v3.1.0

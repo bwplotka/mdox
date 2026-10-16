@@ -20,6 +20,10 @@ We use *breaking* word for marking changes that are not backward compatible (rel
 * [#84](https://github.com/bwplotka/mdox/pull/84) Allow quotes in first header.
 * [#181](https://github.com/bwplotka/mdox/pull/181) Add support for repeated markdown headers.
 
+### Changed
+
+* **breaking**: Building mdox now requires Go 1.27 or newer.
+
 ## [v0.9.0](https://github.com/bwplotka/mdox/releases/tag/v0.9.0)
 
 ### Added
