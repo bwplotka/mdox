@@ -1,6 +1,6 @@
 # mdox
 
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/bwplotka/mdox) [![Latest Release](https://img.shields.io/github/release/bwplotka/mdox.svg?style=flat-square)](https://github.com/bwplotka/mdox/releases/latest) [![CI](https://github.com/bwplotka/mdox/workflows/go/badge.svg)](https://github.com/bwplotka/mdox/actions?query=workflow%3Ago) [![Go Report Card](https://goreportcard.com/badge/github.com/bwplotka/mdox)](https://goreportcard.com/report/github.com/bwplotka/mdox) [![Slack](https://img.shields.io/badge/join%20slack-%23mdox-brightgreen.svg)](https://cloud-native.slack.com/archives/mdox)
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/bwplotka/mdox) [![Latest Release](https://img.shields.io/github/release/bwplotka/mdox.svg?style=flat-square)](https://github.com/bwplotka/mdox/releases/latest) [![CI](https://github.com/bwplotka/mdox/workflows/go/badge.svg)](https://github.com/bwplotka/mdox/actions?query=workflow%3Ago) [![Slack](https://img.shields.io/badge/join%20slack-%23mdox-brightgreen.svg)](https://cloud-native.slack.com/archives/mdox)
 
 `mdox` (spelled as `md docs`) is a CLI for maintaining automated, high-quality project documentation and website leveraging [GitHub Flavored Markdown](https://github.github.com/gfm/) and git.
 
@@ -291,6 +291,8 @@ or via [bingo](https://github.com/bwplotka/bingo) if want to pin it:
 ```shell
 bingo get -u github.com/bwplotka/mdox
 ```
+
+For release notes and version history, see [GitHub Releases](https://github.com/bwplotka/mdox/releases).
 
 ## Production Usage
 
