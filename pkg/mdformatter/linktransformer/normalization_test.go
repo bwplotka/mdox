@@ -59,9 +59,9 @@ func TestValidator_NormalizedURLsShareResult(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusNotFound} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			t.Parallel()
-			var requests atomic.Int32
+			var requests int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				requests.Add(1)
+				atomic.AddInt32(&requests, 1)
 				w.WriteHeader(status)
 			}))
 			defer srv.Close()
@@ -74,16 +74,16 @@ func TestValidator_NormalizedURLsShareResult(t *testing.T) {
 				testutil.NotOk(t, err)
 				testutil.Equals(t, 3, strings.Count(err.Error(), "status code 404"), "all destinations should share the failed result")
 			}
-			testutil.Equals(t, int32(1), requests.Load(), "normalized destinations should share one request")
+			testutil.Equals(t, int32(1), atomic.LoadInt32(&requests), "normalized destinations should share one request")
 		})
 	}
 }
 
 func TestValidator_NormalizedURLsUseCache(t *testing.T) {
 	t.Parallel()
-	var requests atomic.Int32
+	var requests int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		requests.Add(1)
+		atomic.AddInt32(&requests, 1)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -94,7 +94,7 @@ func TestValidator_NormalizedURLsUseCache(t *testing.T) {
 	t.Cleanup(func() { testutil.Ok(t, storage.Close()) })
 	testutil.Ok(t, storage.CacheURL(srv.URL+"/"))
 	testutil.Ok(t, checkRemoteLinks(t, context.Background(), v, srv.URL, srv.URL+"/"))
-	testutil.Equals(t, int32(0), requests.Load(), "normalized destinations should use the cached result")
+	testutil.Equals(t, int32(0), atomic.LoadInt32(&requests), "normalized destinations should use the cached result")
 }
 
 func TestValidator_RedirectedResult(t *testing.T) {
@@ -110,13 +110,13 @@ func TestValidator_RedirectedResult(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var attempts atomic.Int32
+			var attempts int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/origin" {
 					http.Redirect(w, r, "/target", http.StatusMovedPermanently)
 					return
 				}
-				if attempts.Add(1) == 1 && tc.retry {
+				if atomic.AddInt32(&attempts, 1) == 1 && tc.retry {
 					w.WriteHeader(http.StatusServiceUnavailable)
 					return
 				}
@@ -139,7 +139,7 @@ func TestValidator_RedirectedResult(t *testing.T) {
 			if tc.retry {
 				wantAttempts++
 			}
-			testutil.Equals(t, wantAttempts, attempts.Load())
+			testutil.Equals(t, wantAttempts, atomic.LoadInt32(&attempts))
 		})
 	}
 }

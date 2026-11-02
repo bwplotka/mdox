@@ -98,7 +98,7 @@ func TestFormat_ReferenceDefinitions(t *testing.T) {
 					}
 
 					input := tc.input
-					for range 2 {
+					for i := 0; i < 2; i++ {
 						testutil.Ok(t, os.WriteFile(path, []byte(input), 0600))
 						file, err := os.Open(path)
 						testutil.Ok(t, err)
