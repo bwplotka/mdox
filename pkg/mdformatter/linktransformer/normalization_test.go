@@ -100,19 +100,24 @@ func TestValidator_NormalizedURLsUseCache(t *testing.T) {
 func TestValidator_RedirectedResult(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name   string
-		status int
-		retry  bool
+		name         string
+		status       int
+		retry        bool
+		followup     string
+		wantRequests int32
 	}{
-		{name: "failure", status: http.StatusNotFound},
-		{name: "retry recovers", status: http.StatusOK, retry: true},
-		{name: "retry fails", status: http.StatusNotFound, retry: true},
+		{name: "failure", status: http.StatusNotFound, wantRequests: 2},
+		{name: "retry recovers", status: http.StatusOK, retry: true, wantRequests: 3},
+		{name: "retry fails", status: http.StatusNotFound, retry: true, wantRequests: 3},
+		{name: "redirect then direct target", status: http.StatusOK, followup: "/target", wantRequests: 3},
+		{name: "redirects share target", status: http.StatusOK, followup: "/other", wantRequests: 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var attempts int32
+			var attempts, requests int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/origin" {
+				atomic.AddInt32(&requests, 1)
+				if r.URL.Path == "/origin" || r.URL.Path == "/other" {
 					http.Redirect(w, r, "/target", http.StatusMovedPermanently)
 					return
 				}
@@ -139,7 +144,12 @@ func TestValidator_RedirectedResult(t *testing.T) {
 			if tc.retry {
 				wantAttempts++
 			}
+			if tc.followup != "" {
+				testutil.Ok(t, checkRemoteLinks(t, ctx, v, srv.URL+tc.followup))
+				wantAttempts++
+			}
 			testutil.Equals(t, wantAttempts, atomic.LoadInt32(&attempts))
+			testutil.Equals(t, tc.wantRequests, atomic.LoadInt32(&requests), "unexpected redirect retry")
 		})
 	}
 }

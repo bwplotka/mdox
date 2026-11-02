@@ -241,13 +241,14 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
 	transport := newHTTPTransport(config)
+	// remoteLinks deduplicates destinations so Colly can revisit redirect targets.
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx), colly.AllowURLRevisit()),
 		storage:        nil,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
