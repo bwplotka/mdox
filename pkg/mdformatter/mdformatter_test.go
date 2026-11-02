@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/efficientgo/core/testutil"
@@ -38,6 +40,79 @@ func TestFormat_FormatSingle_NoTransformers(t *testing.T) {
 		testutil.Ok(t, f.Format(file2, &buf))
 		testutil.Equals(t, string(exp), buf.String())
 	})
+}
+
+func TestFormat_ReferenceDefinitions(t *testing.T) {
+	for _, tc := range []struct {
+		name, input, expected string
+	}{
+		{
+			name:     "link with title",
+			input:    "[link][ref]\n\n[ref]: https://example.com \"title\"\n",
+			expected: "[link](https://example.com \"title\")\n",
+		},
+		{
+			name:     "image with title",
+			input:    "![image][ref]\n\n[ref]: https://example.com \"title\"\n",
+			expected: "![image](https://example.com \"title\")\n",
+		},
+		{
+			name:     "shortcut and collapsed references",
+			input:    "[ref] and [ref][]\n\n[ref]: https://example.com\n",
+			expected: "[ref](https://example.com) and [ref](https://example.com)\n",
+		},
+		{
+			name:     "adjacent definitions",
+			input:    "[one][a] and [two][b]\n\n[a]: https://example.com\n[b]: https://example.com\n",
+			expected: "[one](https://example.com) and [two](https://example.com)\n",
+		},
+		{
+			name:     "definition in blockquote",
+			input:    "> [link][ref]\n>\n> [ref]: https://example.com\n",
+			expected: "> [link](https://example.com)\n",
+		},
+		{
+			name:     "unused definitions",
+			input:    "[unused]: https://example.com\n[another]: https://example.com/another\n\nText.\n",
+			expected: "Text.\n",
+		},
+		{
+			name:     "only definitions",
+			input:    "[unused]: https://example.com\n",
+			expected: "\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, transform := range []bool{false, true} {
+				name := "without transformer"
+				if transform {
+					name = "with transformer"
+				}
+				t.Run(name, func(t *testing.T) {
+					path := filepath.Join(t.TempDir(), "references.md")
+					f := New(context.Background())
+					expected := tc.expected
+					if transform {
+						f.link = &mockLinkTransformer{}
+						expected = strings.ReplaceAll(expected, "https://example.com", "$$-https://example.com-"+path+"-$$")
+					}
+
+					input := tc.input
+					for range 2 {
+						testutil.Ok(t, os.WriteFile(path, []byte(input), 0600))
+						file, err := os.Open(path)
+						testutil.Ok(t, err)
+						var output bytes.Buffer
+						err = f.Format(file, &output)
+						testutil.Ok(t, file.Close())
+						testutil.Ok(t, err)
+						testutil.Equals(t, expected, output.String())
+						input = output.String()
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestCheck_NoTransformers(t *testing.T) {

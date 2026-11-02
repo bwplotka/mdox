@@ -12,11 +12,12 @@ require (
 	github.com/felixge/fgprof v0.9.5
 	github.com/go-kit/log v0.2.1
 	github.com/gobwas/glob v1.0.0
-	github.com/gocolly/colly/v2 v2.3.0
+	github.com/gocolly/colly/v2 v2.3.1-0.20260902064301-a210c5b4210f
 	github.com/gohugoio/hugo v0.168.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-shellwords v1.0.16
 	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/oklog/run v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.25.0
@@ -72,7 +73,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/niklasfasching/go-org v1.9.1 // indirect
-	github.com/nlnwa/whatwg-url v0.6.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect

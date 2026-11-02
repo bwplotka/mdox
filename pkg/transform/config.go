@@ -54,7 +54,7 @@ type Config struct {
 }
 
 type TransformationConfig struct {
-	_glob glob.Glob
+	_glob *glob.Pattern
 
 	// Glob matches files using https://github.com/gobwas/glob.
 	// Glob is matched against the relative path of the file in the input directory in

@@ -24,6 +24,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -413,9 +414,14 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 		link:      f.link, cb: f.cb,
 		frontMatterLen: len(frontMatter),
 	}
+	parserOptions := []parser.Option{
+		parser.WithAttribute(), // Enable # headers {#custom-ids}.
+		parser.WithHeadingAttribute(),
+		parser.WithASTTransformers(util.Prioritized(referenceDefinitionTransformer{}, 100)),
+	}
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
+		goldmark.WithParserOptions(parserOptions...),
 		goldmark.WithRenderer(nopOpsRenderer{Renderer: tr}),
 	).Convert(content, &tmp); err != nil {
 		return fmt.Errorf("first formatting phase for %v: %w", file.Name(), err)
@@ -425,7 +431,7 @@ func (f *Formatter) Format(file *os.File, out io.Writer) error {
 	}
 	if err := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithAttribute() /* Enable # headers {#custom-ids} */, parser.WithHeadingAttribute()),
+		goldmark.WithParserOptions(parserOptions...),
 		goldmark.WithRenderer(renderer), // No transforming for second phase.
 	).Convert(tmp.Bytes(), out); err != nil {
 		return fmt.Errorf("second formatting phase for %v: %w", file.Name(), err)

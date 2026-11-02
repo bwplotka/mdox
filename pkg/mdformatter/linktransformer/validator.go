@@ -6,11 +6,30 @@ package linktransformer
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	whatwgurl "github.com/nlnwa/whatwg-url/url"
 )
+
+// Match Colly's normalization so requests, results, and cache entries share a key.
+var remoteURLParser = whatwgurl.NewParser(whatwgurl.WithPercentEncodeSinglePercentSign())
+
+func normalizeRemoteURL(dest string) (string, error) {
+	u, err := remoteURLParser.Parse(dest)
+	if err != nil {
+		return "", err
+	}
+	// Colly also passes the WHATWG URL through net/url before issuing requests.
+	parsed, err := url.Parse(u.Href(false))
+	if err != nil {
+		return "", err
+	}
+	return parsed.String(), nil
+}
 
 type Validator interface {
 	IsValid(k futureKey, r *validator) (bool, error)
@@ -88,10 +107,23 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 		return LocalValidator{}.IsValid(k, r)
 	}
 
+	dest, err := normalizeRemoteURL(k.dest)
+	if err != nil {
+		r.destFutures[k].resultFn = func() error { return fmt.Errorf("parse remote link %v: %w", k.dest, err) }
+		return false, nil
+	}
 	// Result will be in future.
-	r.destFutures[k].resultFn = func() error { return r.remoteLinks[k.dest] }
+	r.destFutures[k].resultFn = func() error {
+		r.rMu.RLock()
+		defer r.rMu.RUnlock()
+		result, ok := r.remoteLinks[dest]
+		if !ok {
+			return fmt.Errorf("remote link %v has no validation result", k.dest)
+		}
+		return result
+	}
 	r.rMu.RLock()
-	if _, ok := r.remoteLinks[k.dest]; ok {
+	if _, ok := r.remoteLinks[dest]; ok {
 		r.rMu.RUnlock()
 		return true, nil
 	}
@@ -100,21 +132,24 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.rMu.Lock()
 	defer r.rMu.Unlock()
 	// We need to check again here to avoid race.
-	if _, ok := r.remoteLinks[k.dest]; ok {
+	if _, ok := r.remoteLinks[dest]; ok {
 		return true, nil
 	}
 
 	if r.storage != nil {
 		// Check if URL is already in cache database.
-		if ok, err := r.storage.IsCached(k.dest); ok && err == nil {
+		if ok, err := r.storage.IsCached(dest); ok && err == nil {
 			r.l.roundTripCachedLinks.Inc()
+			r.remoteLinks[dest] = nil
 			return true, nil
 		}
 	}
 
 	r.l.roundTripVisitedLinks.Inc()
-	if err := r.c.Visit(k.dest); err != nil {
-		r.remoteLinks[k.dest] = fmt.Errorf("remote link %v: %w", k.dest, err)
+	// Reserve the result before scheduling so duplicates share in-flight retries.
+	r.remoteLinks[dest] = fmt.Errorf("remote link %v did not complete validation", k.dest)
+	if err := r.c.Visit(dest); err != nil {
+		r.remoteLinks[dest] = fmt.Errorf("remote link %v: %w", k.dest, err)
 		return false, nil
 	}
 	return true, nil

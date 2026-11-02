@@ -139,8 +139,8 @@ github.com/gobwas/pool v0.2.1/go.mod h1:q8bcK0KcYlCgd9e7WYLm9LpyS+YeLd8JVDW6Wezm
 github.com/gobwas/ws v1.2.1/go.mod h1:hRKAFb8wOxFROYNsT1bqfWnhX+b5MFeJM9r2ZSwg/KY=
 github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
 github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
-github.com/gocolly/colly/v2 v2.3.0 h1:HSFh0ckbgVd2CSGRE+Y/iA4goUhGROJwyQDCMXGFBWM=
-github.com/gocolly/colly/v2 v2.3.0/go.mod h1:Qp54s/kQbwCQvFVx8KzKCSTXVJ1wWT4QeAKEu33x1q8=
+github.com/gocolly/colly/v2 v2.3.1-0.20260902064301-a210c5b4210f h1:TQ4pBEdz5lRHRREo71CNtVuKmj8L26o/S1+HJGNdGwA=
+github.com/gocolly/colly/v2 v2.3.1-0.20260902064301-a210c5b4210f/go.mod h1:QbohPXbFm3/F63xK+whdAsam4WuTrrPpysexaJhTB3o=
 github.com/gohugoio/gift v0.2.0 h1:vA31pP0rTVmBxBrhpY3WEt+4zM4g+1sDqYeemwsYeqc=
 github.com/gohugoio/gift v0.2.0/go.mod h1:1Mrm5CjF33KpD749Dwj+UAjWZ3LC6cBXGuTMa5XwoP4=
 github.com/gohugoio/go-i18n/v2 v2.1.3-0.20251018145728-cfcc22d823c6 h1:pxlAea9eRwuAnt/zKbGqlFO2ZszpIe24YpOVLf+N+4I=
