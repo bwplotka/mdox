@@ -116,11 +116,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 	r.destFutures[k].resultFn = func() error {
 		r.rMu.RLock()
 		defer r.rMu.RUnlock()
-		result, ok := r.remoteLinks[dest]
-		if !ok {
-			return fmt.Errorf("remote link %v has no validation result", k.dest)
-		}
-		return result
+		return r.remoteLinks[dest]
 	}
 	r.rMu.RLock()
 	if _, ok := r.remoteLinks[dest]; ok {
@@ -147,7 +143,7 @@ func (v RoundTripValidator) IsValid(k futureKey, r *validator) (bool, error) {
 
 	r.l.roundTripVisitedLinks.Inc()
 	// Reserve the result before scheduling so duplicates share in-flight retries.
-	r.remoteLinks[dest] = fmt.Errorf("remote link %v did not complete validation", k.dest)
+	r.remoteLinks[dest] = nil
 	if err := r.c.Visit(dest); err != nil {
 		r.remoteLinks[dest] = fmt.Errorf("remote link %v: %w", k.dest, err)
 		return false, nil

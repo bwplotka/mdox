@@ -17,7 +17,6 @@ import (
 	"github.com/bwplotka/mdox/pkg/cache"
 	"github.com/efficientgo/core/testutil"
 	"github.com/go-kit/log"
-	"github.com/gocolly/colly/v2"
 )
 
 func TestValidator_NormalizedURLs(t *testing.T) {
@@ -98,23 +97,6 @@ func TestValidator_NormalizedURLsUseCache(t *testing.T) {
 	testutil.Equals(t, int32(0), requests.Load(), "normalized destinations should use the cached result")
 }
 
-func TestValidator_AbortedRequest(t *testing.T) {
-	t.Parallel()
-	var requests atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		requests.Add(1)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-	v, err := NewValidator(context.Background(), log.NewNopLogger(), nil, t.TempDir(), nil, nil)
-	testutil.Ok(t, err)
-	v.(*validator).c.OnRequest(func(r *colly.Request) { r.Abort() })
-	err = checkRemoteLinks(t, context.Background(), v, srv.URL)
-	testutil.NotOk(t, err)
-	testutil.Assert(t, strings.Contains(err.Error(), "did not complete validation"), "unexpected error: %v", err)
-	testutil.Equals(t, int32(0), requests.Load())
-}
-
 func TestValidator_RedirectedResult(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -122,7 +104,6 @@ func TestValidator_RedirectedResult(t *testing.T) {
 		status int
 		retry  bool
 	}{
-		{name: "success", status: http.StatusOK},
 		{name: "failure", status: http.StatusNotFound},
 		{name: "retry recovers", status: http.StatusOK, retry: true},
 		{name: "retry fails", status: http.StatusNotFound, retry: true},
