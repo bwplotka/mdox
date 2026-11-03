@@ -340,7 +340,7 @@ func TestValidator_BackoffDoesNotBlockOtherLinks(t *testing.T) {
 	err = <-result
 	testutil.NotOk(t, err)
 	testutil.Assert(t, strings.Contains(err.Error(), context.Canceled.Error()), "unexpected cancellation error: %v", err)
-	testutil.Assert(t, !strings.Contains(err.Error(), colly.ErrAlreadyVisited.Error()), "duplicate link did not share the final result: %v", err)
+	testutil.Equals(t, 2, strings.Count(err.Error(), "canceled during backoff"), "duplicate link did not share the final result: %v", err)
 	testutil.Equals(t, int32(2), atomic.LoadInt32(&requests))
 }
 

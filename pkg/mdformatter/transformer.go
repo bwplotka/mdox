@@ -11,6 +11,7 @@ import (
 
 	"github.com/efficientgo/core/merrors"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
 	"golang.org/x/net/html"
@@ -21,6 +22,26 @@ type nopOpsRenderer struct {
 }
 
 func (nopOpsRenderer) AddOptions(...renderer.Option) {}
+
+type referenceDefinitionTransformer struct{}
+
+func (referenceDefinitionTransformer) Transform(doc *ast.Document, _ text.Reader, _ parser.Context) {
+	// Goldmark retains reference definitions since v1.8. markdownfmt renders
+	// resolved references inline and does not support definition nodes.
+	removeReferenceDefinitions(doc)
+}
+
+func removeReferenceDefinitions(node ast.Node) {
+	for child := node.FirstChild(); child != nil; {
+		next := child.NextSibling()
+		if child.Kind() == ast.KindLinkReferenceDefinition {
+			node.RemoveChild(node, child)
+		} else {
+			removeReferenceDefinitions(child)
+		}
+		child = next
+	}
+}
 
 // transformer is a Renderer that is used as a transform layer just before render stage.
 // This is to allow customer transforming that goes out of scope of goldmark AST Transformer.
@@ -151,7 +172,7 @@ func (t *transformer) Render(w io.Writer, source []byte, node ast.Node) error {
 			if !entering || t.cb == nil || typedNode.Info == nil {
 				return ast.WalkSkipChildren, nil
 			}
-			blockContent, err := t.cb.TransformCodeBlock(t.sourceCtx, typedNode.Info.Text(source), typedNode.Text(source))
+			blockContent, err := t.cb.TransformCodeBlock(t.sourceCtx, typedNode.Info.Value(source), typedNode.Lines().Value(source))
 			if err != nil {
 				return ast.WalkStop, err
 			}

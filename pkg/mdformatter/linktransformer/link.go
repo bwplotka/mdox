@@ -241,13 +241,14 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 
 	linktransformerMetrics := newLinktransformerMetrics(reg)
 	transport := newHTTPTransport(config)
+	// remoteLinks deduplicates destinations so Colly can revisit redirect targets.
 	v := &validator{
 		logger:         logger,
 		anchorDir:      anchorDir,
 		validateConfig: config,
 		localLinks:     map[string]*[]string{},
 		remoteLinks:    map[string]error{},
-		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx)),
+		c:              colly.NewCollector(colly.Async(), colly.StdlibContext(ctx), colly.AllowURLRevisit()),
 		storage:        nil,
 		destFutures:    map[futureKey]*futureResult{},
 		l:              linktransformerMetrics,
@@ -294,7 +295,10 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 	v.c.OnRequest(func(request *colly.Request) {
 		v.rMu.Lock()
 		defer v.rMu.Unlock()
-		request.Ctx.Put(originalURLKey, request.URL.String())
+		// Retries after redirects reuse the context but may have a different URL.
+		if request.Ctx.Get(originalURLKey) == "" {
+			request.Ctx.Put(originalURLKey, request.URL.String())
+		}
 	})
 	v.c.OnScraped(func(response *colly.Response) {
 		v.rMu.Lock()
@@ -323,7 +327,7 @@ func NewValidator(ctx context.Context, logger log.Logger, linksValidateConfig []
 			v.rMu.Lock()
 			v.remoteLinks[response.Ctx.Get(originalURLKey)] = fmt.Errorf(
 				"%q not accessible, status code %v, canceled during backoff: %w",
-				response.Request.URL.String(), response.StatusCode, ctxErr)
+				response.Ctx.Get(originalURLKey), response.StatusCode, ctxErr)
 			v.rMu.Unlock()
 			return
 		}
@@ -346,7 +350,7 @@ func (v *validator) recordError(response *colly.Response, err error) (bool, time
 
 	originalURL := response.Ctx.Get(originalURLKey)
 	if ctxErr := v.c.Context.Err(); ctxErr != nil {
-		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v: %w", response.Request.URL.String(), response.StatusCode, ctxErr)
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v: %w", originalURL, response.StatusCode, ctxErr)
 		return false, 0
 	}
 	retries, _ := strconv.Atoi(response.Ctx.Get(numberOfRetriesKey))
@@ -359,16 +363,16 @@ func (v *validator) recordError(response *colly.Response, err error) (bool, time
 			backoff := time.Duration(1<<uint(retries+1)) * time.Second
 			delay, delayErr := retryDelay(response, backoff)
 			if delayErr != nil {
-				v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v, %v: %w", response.Request.URL.String(), response.StatusCode, delayErr, err)
+				v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v, %v: %w", originalURL, response.StatusCode, delayErr, err)
 				return false, 0
 			}
 			response.Ctx.Put(numberOfRetriesKey, strconv.Itoa(retries+1))
 			return true, delay
 		}
-		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v after %d retries: %w", response.Request.URL.String(), response.StatusCode, retries, err)
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible, status code %v after %d retries: %w", originalURL, response.StatusCode, retries, err)
 
 	default:
-		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v: %w", response.Request.URL.String(), response.StatusCode, err)
+		v.remoteLinks[originalURL] = fmt.Errorf("%q not accessible; status code %v: %w", originalURL, response.StatusCode, err)
 	}
 
 	return false, 0
