@@ -16,7 +16,7 @@ require (
 	github.com/gohugoio/hugo v0.169.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-shellwords v1.0.16
-	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/mattn/go-sqlite3 v1.14.53
 	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/oklog/run v1.2.0
 	github.com/pkg/errors v0.9.1
